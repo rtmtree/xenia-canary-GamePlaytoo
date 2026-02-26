@@ -1,0 +1,3 @@
+create a script to build the whole project with Emscriten and copy wasm/js to @web 
+
+and make the web project run it (React I guess)

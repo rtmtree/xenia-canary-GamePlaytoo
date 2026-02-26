@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xenia Web Emulator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Xenia Web Emulator</h1>
+            <p>Xbox 360 Emulator in the Browser</p>
+        </header>
+        
+        <main>
+            <div class="controls">
+                <div class="import-section">
+                    <label for="rom-input" class="file-label">
+                        <span class="icon">📁</span>
+                        Import ROM File
+                    </label>
+                    <input type="file" id="rom-input" accept=".iso,.xex,.bin" hidden>
+                    <div class="file-info" id="file-info">
+                        <span id="file-name">No file selected</span>
+                        <span id="file-size"></span>
+                    </div>
+                </div>
+                
+                <div class="game-controls">
+                    <button id="play-btn" disabled>▶️ Play</button>
+                    <button id="pause-btn" disabled>⏸️ Pause</button>
+                    <button id="stop-btn" disabled>⏹️ Stop</button>
+                    <button id="fullscreen-btn" disabled>🔳 Fullscreen</button>
+                </div>
+            </div>
+            
+            <div class="game-container">
+                <canvas id="game-canvas" width="1280" height="720">
+                    Your browser does not support the canvas element.
+                </canvas>
+                <div class="loading-overlay" id="loading-overlay">
+                    <div class="spinner"></div>
+                    <p>Loading game...</p>
+                </div>
+                <div class="error-overlay" id="error-overlay" hidden>
+                    <p id="error-message">Error loading game</p>
+                    <button id="retry-btn">Retry</button>
+                </div>
+            </div>
+            
+            <div class="status-bar">
+                <span id="status">Ready</span>
+                <span id="fps">FPS: 0</span>
+                <span id="memory">Memory: 0 MB</span>
+            </div>
+        </main>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
