@@ -68,21 +68,39 @@ function App() {
   const [fps, setFps] = useState(0);
   const [memory, setMemory] = useState(0);
   const [status, setStatus] = useState('Initializing...');
+  const [wasmTest, setWasmTest] = useState('Not tested');
   const canvasRef = useRef(null);
 
   useEffect(() => {
     const initializeWasm = async () => {
       try {
+        console.log('🔍 Starting WebAssembly initialization...');
         const loader = new XeniaWasmLoader();
+        console.log('🔍 Loader created, attempting to load...');
         const success = await loader.load();
+        console.log('🔍 Load result:', success);
         if (success) {
           setWasmLoader(loader);
           setStatus('Ready');
+          setWasmTest('✅ WebAssembly loaded successfully');
+          console.log('✅ WebAssembly loaded successfully');
+          
+          // Test functions
+          try {
+            const initResult = loader.module._initialize_emulator();
+            const frameBuffer = loader.module._get_frame_buffer();
+            setWasmTest(`✅ Functions working! init: ${initResult}, frameBuffer: ${frameBuffer}`);
+          } catch (e) {
+            setWasmTest('❌ Functions failed: ' + e.message);
+          }
         } else {
           setError('Failed to load WebAssembly module');
           setStatus('Error');
+          setWasmTest('❌ WebAssembly load failed');
+          console.error('❌ WebAssembly load failed');
         }
       } catch (err) {
+        console.error('❌ WebAssembly initialization error:', err);
         setError(`WebAssembly initialization failed: ${err.message}`);
         setStatus('Error');
       }
@@ -272,6 +290,7 @@ function App() {
             status={status}
             fps={fps}
             memory={memory}
+            wasmTest={wasmTest}
           />
         </GameContainer>
       </Main>

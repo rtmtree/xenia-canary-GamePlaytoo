@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebAssembly Debug</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        .log { margin: 5px 0; padding: 5px; background: #f0f0f0; }
+        .error { background: #ffcccc; }
+        .success { background: #ccffcc; }
+    </style>
+</head>
+<body>
+    <h1>WebAssembly Debug Test</h1>
+    <div id="output"></div>
+
+    <script>
+        const output = document.getElementById('output');
+        
+        function log(message, isError = false, isSuccess = false) {
+            console.log(message);
+            const div = document.createElement('div');
+            div.className = isError ? 'log error' : isSuccess ? 'log success' : 'log';
+            div.textContent = message;
+            output.appendChild(div);
+        }
+
+        async function debugWasm() {
+            log('🔍 Starting WebAssembly debug...');
+            
+            try {
+                // Test 1: Check if fetch works
+                log('🔍 Testing fetch for WASM file...');
+                const response = await fetch('./src/wasm/xenia_wasm.wasm');
+                if (response.ok) {
+                    log('✅ WASM file fetchable: ' + response.url, false, true);
+                } else {
+                    log('❌ WASM file not fetchable: ' + response.status, true);
+                    return;
+                }
+
+                // Test 2: Check JS file
+                log('🔍 Testing fetch for JS file...');
+                const jsResponse = await fetch('./src/wasm/xenia_wasm.js');
+                if (jsResponse.ok) {
+                    log('✅ JS file fetchable: ' + jsResponse.url, false, true);
+                } else {
+                    log('❌ JS file not fetchable: ' + jsResponse.status, true);
+                    return;
+                }
+
+                // Test 3: Try to import the module
+                log('🔍 Attempting to import JS module...');
+                const module = await import('./src/wasm/xenia_wasm.js');
+                log('✅ JS module imported successfully', false, true);
+
+                // Test 4: Try to initialize WASM
+                log('🔍 Attempting to initialize WASM...');
+                const wasmModule = await module.default();
+                log('✅ WASM module initialized: ' + typeof wasmModule, false, true);
+
+                // Test 5: Check if functions exist
+                log('🔍 Checking exported functions...');
+                const functions = ['_initialize_emulator', '_load_rom', '_start_emulation', '_stop_emulation', '_get_frame_buffer'];
+                functions.forEach(func => {
+                    if (typeof wasmModule[func] === 'function') {
+                        log('✅ Function ' + func + ' exists', false, true);
+                    } else {
+                        log('❌ Function ' + func + ' missing or not a function', true);
+                    }
+                });
+
+                // Test 6: Try calling a function
+                log('🔍 Testing function call...');
+                const result = wasmModule._initialize_emulator();
+                log('✅ initialize_emulator() returned: ' + result, false, true);
+
+                // Test 7: Test frame buffer
+                log('🔍 Testing frame buffer...');
+                const frameBuffer = wasmModule._get_frame_buffer();
+                log('✅ Frame buffer pointer: ' + frameBuffer, false, true);
+
+                log('🎉 All tests passed! WebAssembly is working correctly.', false, true);
+
+            } catch (error) {
+                log('❌ Error: ' + error.message, true);
+                log('❌ Stack: ' + error.stack, true);
+            }
+        }
+
+        // Start debug
+        debugWasm();
+    </script>
+</body>
+</html>

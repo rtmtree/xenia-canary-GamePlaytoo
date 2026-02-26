@@ -9,14 +9,18 @@ class XeniaWasmLoader {
         if (this.isLoaded) return;
         
         try {
+            console.log('🔍 Attempting to import WebAssembly module...');
             // Import the WebAssembly module
             const XeniaWasm = await import('./xenia_wasm.js');
+            console.log('🔍 Module imported, initializing...');
             this.module = await XeniaWasm.default();
+            console.log('🔍 Module initialized:', this.module);
             this.isLoaded = true;
-            console.log('Xenia WebAssembly module loaded successfully');
+            console.log('✅ Xenia WebAssembly module loaded successfully');
             return true;
         } catch (error) {
-            console.error('Failed to load Xenia WebAssembly module:', error);
+            console.error('❌ Failed to load Xenia WebAssembly module:', error);
+            console.error('❌ Error details:', error.message, error.stack);
             return false;
         }
     }

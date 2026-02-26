@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple WASM Test</title>
+</head>
+<body>
+    <h1>Simple WebAssembly Test</h1>
+    <div id="status">Loading...</div>
+    <div id="result"></div>
+
+    <script type="module">
+        const status = document.getElementById('status');
+        const result = document.getElementById('result');
+        
+        async function test() {
+            try {
+                status.textContent = 'Loading WebAssembly...';
+                
+                // Import and initialize
+                const XeniaWasm = await import('./src/wasm/xenia_wasm.js');
+                const module = await XeniaWasm.default();
+                
+                status.textContent = 'Testing functions...';
+                
+                // Test all functions
+                const tests = [
+                    { name: 'initialize_emulator', func: () => module._initialize_emulator() },
+                    { name: 'load_rom', func: () => module._load_rom(new Uint8Array([1,2,3,4]), 4) },
+                    { name: 'start_emulation', func: () => module._start_emulation() },
+                    { name: 'stop_emulation', func: () => module._stop_emulation() },
+                    { name: 'get_frame_buffer', func: () => module._get_frame_buffer() }
+                ];
+                
+                let html = '';
+                for (const test of tests) {
+                    try {
+                        const testResult = test.func();
+                        html += `<p><strong>${test.name}:</strong> ${testResult} ✅</p>`;
+                    } catch (e) {
+                        html += `<p><strong>${test.name}:</strong> Error - ${e.message} ❌</p>`;
+                    }
+                }
+                
+                result.innerHTML = html;
+                status.textContent = '✅ All tests completed!';
+                
+            } catch (error) {
+                status.textContent = '❌ Error: ' + error.message;
+                result.innerHTML = '<p style="color: red;">' + error.message + '</p>';
+                console.error('Full error:', error);
+            }
+        }
+        
+        test();
+    </script>
+</body>
+</html>

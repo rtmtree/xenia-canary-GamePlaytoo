@@ -115,6 +115,8 @@ EMCC_FLAGS=(
     -s ENVIRONMENT="web"
     -s NODEJS_CATCH_EXIT=0
     -s NODEJS_CATCH_REJECTION=0
+    -s SINGLE_FILE=1
+    -s WASM_ASYNC_COMPILATION=0
     --std=c++17
     -o xenia_wasm.js
     main_wasm.cpp

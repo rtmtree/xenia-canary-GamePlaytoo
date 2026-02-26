@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Final WebAssembly Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #1e3c72; color: white; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 10px; }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .info { color: #2196F3; }
+        canvas { border: 2px solid #fff; margin: 10px 0; }
+        button { background: #667eea; color: white; border: none; padding: 10px 20px; border-radius: 5px; margin: 5px; cursor: pointer; }
+        button:hover { background: #764ba2; }
+        button:disabled { background: #666; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Xenia WebAssembly Final Test</h1>
+        
+        <div class="test-section">
+            <h2>WebAssembly Module Test</h2>
+            <div id="wasm-status">Loading...</div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Game Canvas Test</h2>
+            <canvas id="game-canvas" width="400" height="300"></canvas>
+            <div>
+                <button id="start-btn" disabled>Start Game</button>
+                <button id="stop-btn" disabled>Stop Game</button>
+            </div>
+            <div id="game-status">Game not started</div>
+            <div id="fps-counter">FPS: 0</div>
+        </div>
+        
+        <div class="test-section">
+            <h2>ROM Import Test</h2>
+            <input type="file" id="rom-input" accept=".iso,.xex,.bin" />
+            <div id="rom-info">No ROM selected</div>
+        </div>
+    </div>
+
+    <script type="module">
+        let wasmModule = null;
+        let isGameRunning = false;
+        let animationId = null;
+        let frameCount = 0;
+        let lastFrameTime = 0;
+        
+        const wasmStatus = document.getElementById('wasm-status');
+        const gameStatus = document.getElementById('game-status');
+        const fpsCounter = document.getElementById('fps-counter');
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const romInput = document.getElementById('rom-input');
+        const romInfo = document.getElementById('rom-info');
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = message;
+            wasmStatus.appendChild(div);
+            console.log(message);
+        }
+        
+        async function initWasm() {
+            try {
+                log('🔍 Loading WebAssembly module...');
+                
+                const XeniaWasm = await import('./src/wasm/xenia_wasm.js');
+                wasmModule = await XeniaWasm.default();
+                
+                log('✅ WebAssembly module loaded successfully!', 'success');
+                
+                // Test all functions
+                const tests = [
+                    { name: 'initialize_emulator', func: () => wasmModule._initialize_emulator() },
+                    { name: 'start_emulation', func: () => wasmModule._start_emulation() },
+                    { name: 'stop_emulation', func: () => wasmModule._stop_emulation() },
+                    { name: 'get_frame_buffer', func: () => wasmModule._get_frame_buffer() }
+                ];
+                
+                for (const test of tests) {
+                    try {
+                        const result = test.func();
+                        log(`✅ ${test.name}: ${result}`, 'success');
+                    } catch (e) {
+                        log(`❌ ${test.name}: ${e.message}`, 'error');
+                    }
+                }
+                
+                startBtn.disabled = false;
+                log('🎮 WebAssembly ready for gaming!', 'success');
+                
+            } catch (error) {
+                log(`❌ WebAssembly failed: ${error.message}`, 'error');
+                console.error('Full error:', error);
+            }
+        }
+        
+        function startGame() {
+            if (!wasmModule || isGameRunning) return;
+            
+            try {
+                log('🎮 Starting game...', 'info');
+                
+                // Initialize emulator
+                wasmModule._initialize_emulator();
+                wasmModule._start_emulation();
+                
+                isGameRunning = true;
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                gameStatus.textContent = 'Game running...';
+                
+                renderLoop();
+                log('✅ Game started successfully!', 'success');
+                
+            } catch (error) {
+                log(`❌ Failed to start game: ${error.message}`, 'error');
+            }
+        }
+        
+        function stopGame() {
+            if (!wasmModule || !isGameRunning) return;
+            
+            try {
+                wasmModule._stop_emulation();
+                
+                isGameRunning = false;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                gameStatus.textContent = 'Game stopped';
+                
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                    animationId = null;
+                }
+                
+                // Clear canvas
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                log('✅ Game stopped successfully!', 'success');
+                
+            } catch (error) {
+                log(`❌ Failed to stop game: ${error.message}`, 'error');
+            }
+        }
+        
+        function renderLoop() {
+            if (!isGameRunning) return;
+            
+            const currentTime = performance.now();
+            
+            // Calculate FPS
+            if (lastFrameTime) {
+                const deltaTime = currentTime - lastFrameTime;
+                const fps = Math.round(1000 / deltaTime);
+                frameCount++;
+                
+                if (frameCount % 30 === 0) {
+                    fpsCounter.textContent = `FPS: ${fps}`;
+                }
+            }
+            lastFrameTime = currentTime;
+            
+            // Get frame buffer from WebAssembly
+            try {
+                const frameBuffer = wasmModule._get_frame_buffer();
+                
+                if (frameBuffer) {
+                    // Create a smaller test canvas (400x300) for demo
+                    const imageData = ctx.createImageData(canvas.width, canvas.height);
+                    
+                    // Sample the frame buffer (assuming 1280x720 original)
+                    for (let y = 0; y < canvas.height; y++) {
+                        for (let x = 0; x < canvas.width; x++) {
+                            // Map to original coordinates
+                            const origX = Math.floor(x * 1280 / canvas.width);
+                            const origY = Math.floor(y * 720 / canvas.height);
+                            const srcIdx = (origY * 1280 + origX) * 4;
+                            const destIdx = (y * canvas.width + x) * 4;
+                            
+                            imageData.data[destIdx] = wasmModule.HEAPU8[frameBuffer + srcIdx];     // R
+                            imageData.data[destIdx + 1] = wasmModule.HEAPU8[frameBuffer + srcIdx + 1]; // G
+                            imageData.data[destIdx + 2] = wasmModule.HEAPU8[frameBuffer + srcIdx + 2]; // B
+                            imageData.data[destIdx + 3] = wasmModule.HEAPU8[frameBuffer + srcIdx + 3]; // A
+                        }
+                    }
+                    
+                    ctx.putImageData(imageData, 0, 0);
+                }
+            } catch (error) {
+                console.error('Render error:', error);
+            }
+            
+            animationId = requestAnimationFrame(renderLoop);
+        }
+        
+        // Event listeners
+        startBtn.addEventListener('click', startGame);
+        stopBtn.addEventListener('click', stopGame);
+        
+        romInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                romInfo.textContent = `Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+                
+                // Test ROM loading
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const romData = new Uint8Array(e.target.result);
+                        const result = wasmModule._load_rom(romData, romData.length);
+                        log(`✅ ROM loaded: ${file.name}, result: ${result}`, 'success');
+                    } catch (error) {
+                        log(`❌ ROM loading failed: ${error.message}`, 'error');
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        });
+        
+        // Initialize
+        initWasm();
+    </script>
+</body>
+</html>

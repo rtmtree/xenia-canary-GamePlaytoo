@@ -24,7 +24,7 @@ const StatusItem = styled.span`
   gap: 5px;
 `;
 
-const StatusBar = ({ status, fps, memory }) => {
+const StatusBar = ({ status, fps, memory, wasmTest }) => {
   return (
     <StatusBarContainer>
       <StatusItem>
@@ -35,6 +35,9 @@ const StatusBar = ({ status, fps, memory }) => {
       </StatusItem>
       <StatusItem>
         <strong>Memory:</strong> {memory} MB
+      </StatusItem>
+      <StatusItem>
+        <strong>WASM:</strong> {wasmTest}
       </StatusItem>
     </StatusBarContainer>
   );

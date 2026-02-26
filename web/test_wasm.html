@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebAssembly Test</title>
+</head>
+<body>
+    <h1>WebAssembly Test</h1>
+    <div id="status">Loading...</div>
+    <div id="logs"></div>
+
+    <script type="module">
+        const status = document.getElementById('status');
+        const logs = document.getElementById('logs');
+        
+        function log(message) {
+            console.log(message);
+            logs.innerHTML += '<p>' + message + '</p>';
+        }
+
+        async function testWasm() {
+            try {
+                log('Starting WebAssembly test...');
+                status.textContent = 'Loading WebAssembly module...';
+                
+                // Import the WebAssembly module
+                const XeniaWasm = await import('./src/wasm/xenia_wasm.js');
+                log('Module imported successfully');
+                
+                status.textContent = 'Initializing WebAssembly...';
+                const module = await XeniaWasm.default();
+                log('WebAssembly module initialized');
+                
+                // Test functions
+                log('Testing initialize_emulator...');
+                const initResult = module._initialize_emulator();
+                log('initialize_emulator result: ' + initResult);
+                
+                log('Testing get_frame_buffer...');
+                const frameBuffer = module._get_frame_buffer();
+                log('Frame buffer pointer: ' + frameBuffer);
+                log('Frame buffer size: ' + (1280 * 720 * 4) + ' bytes');
+                
+                // Test frame buffer data
+                const firstPixel = new Uint8Array(module.HEAPU8.buffer, frameBuffer, 4);
+                log('First pixel RGBA: [' + Array.from(firstPixel).join(', ') + ']');
+                
+                status.textContent = '✅ WebAssembly working correctly!';
+                log('✅ All tests passed!');
+                
+            } catch (error) {
+                status.textContent = '❌ Error: ' + error.message;
+                log('❌ Error: ' + error.message);
+                log('Stack: ' + error.stack);
+            }
+        }
+
+        testWasm();
+    </script>
+</body>
+</html>
