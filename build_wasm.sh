@@ -152,7 +152,7 @@ EMCC_FLAGS=(
     --bind
     -s WASM=1
     -s ALLOW_MEMORY_GROWTH=1
-    -s EXPORTED_FUNCTIONS="[_initialize_emulator,_load_rom,_start_emulation,_stop_emulation,_render_frame,_get_frame_buffer]"
+    -s EXPORTED_FUNCTIONS="[_malloc,_free,_initialize_emulator,_load_rom,_start_emulation,_stop_emulation,_render_frame,_get_frame_buffer]"
     -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap']"
     -s MODULARIZE=1
     -s EXPORT_NAME="'XeniaWasm'"
@@ -160,6 +160,10 @@ EMCC_FLAGS=(
     -s NO_EXIT_RUNTIME=1
     -s ERROR_ON_UNDEFINED_SYMBOLS=0
     -s WARN_ON_UNDEFINED_SYMBOLS=0
+    -s ENVIRONMENT="web"
+    -s WASM_ASYNC_COMPILATION=0
+    -s SINGLE_FILE=0
+    -s EXPORT_ES6=1
     -I"$PROJECT_ROOT/src"
     -I"$PROJECT_ROOT/third_party"
     --std=c++17

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGPU Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #1e3c72; color: white; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 10px; }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .info { color: #2196F3; }
+        canvas { border: 2px solid #fff; margin: 10px 0; }
+        button { background: #667eea; color: white; border: none; padding: 10px 20px; border-radius: 5px; margin: 5px; cursor: pointer; }
+        button:hover { background: #764ba2; }
+        button:disabled { background: #666; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Xenia WebGPU Test</h1>
+        
+        <div class="test-section">
+            <h2>WebGPU Support Check</h2>
+            <div id="webgpu-status">Checking...</div>
+        </div>
+        
+        <div class="test-section">
+            <h2>WebAssembly Module Test</h2>
+            <div id="wasm-status">Loading...</div>
+        </div>
+        
+        <div class="test-section">
+            <h2>WebGPU Rendering Test</h2>
+            <canvas id="game-canvas" width="1280" height="720" style="max-width: 100%; height: auto;"></canvas>
+            <div>
+                <button id="init-webgpu-btn" disabled>Initialize WebGPU</button>
+                <button id="start-render-btn" disabled>Start Rendering</button>
+                <button id="stop-render-btn" disabled>Stop Rendering</button>
+            </div>
+            <div id="render-status">Not initialized</div>
+            <div id="fps-counter">FPS: 0</div>
+        </div>
+    </div>
+
+    <script type="module">
+        let wasmModule = null;
+        let isRendering = false;
+        let animationId = null;
+        let frameCount = 0;
+        let lastFrameTime = 0;
+        let webgpuDevice = null;
+        let webgpuContext = null;
+        
+        const webgpuStatus = document.getElementById('webgpu-status');
+        const wasmStatus = document.getElementById('wasm-status');
+        const renderStatus = document.getElementById('render-status');
+        const fpsCounter = document.getElementById('fps-counter');
+        const canvas = document.getElementById('game-canvas');
+        const initWebGPUBtn = document.getElementById('init-webgpu-btn');
+        const startRenderBtn = document.getElementById('start-render-btn');
+        const stopRenderBtn = document.getElementById('stop-render-btn');
+        
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = message;
+            element.appendChild(div);
+            console.log(message);
+        }
+        
+        // Check WebGPU support
+        async function checkWebGPUSupport() {
+            try {
+                if (!navigator.gpu) {
+                    log('webgpu-status', '❌ WebGPU not supported in this browser', 'error');
+                    return false;
+                }
+                
+                const adapter = await navigator.gpu.requestAdapter({
+                    powerPreference: 'high-performance'
+                });
+                
+                if (!adapter) {
+                    log('webgpu-status', '❌ No WebGPU adapter found', 'error');
+                    return false;
+                }
+                
+                const device = await adapter.requestDevice();
+                log('webgpu-status', '✅ WebGPU supported and device created', 'success');
+                return true;
+            } catch (error) {
+                log('webgpu-status', '❌ WebGPU check failed: ' + error.message, 'error');
+                return false;
+            }
+        }
+        
+        // Load WebAssembly module
+        async function loadWASM() {
+            try {
+                log('wasm-status', '🔍 Loading WebGPU WebAssembly module...');
+                
+                const XeniaWebGPU = await import('./src/wasm/xenia_webgpu.js');
+                wasmModule = await XeniaWebGPU.default();
+                
+                log('wasm-status', '✅ WebGPU WebAssembly module loaded successfully', 'success');
+                
+                // Test functions
+                const tests = [
+                    { name: 'initialize_emulator', func: () => wasmModule._initialize_emulator() },
+                    { name: 'initialize_webgpu', func: () => wasmModule._initialize_webgpu() },
+                    { name: 'get_webgpu_info', func: () => wasmModule._get_webgpu_info() },
+                    { name: 'get_frame_buffer', func: () => wasmModule._get_frame_buffer() }
+                ];
+                
+                for (const test of tests) {
+                    try {
+                        const result = test.func();
+                        log('wasm-status', `✅ ${test.name}: ${result}`, 'success');
+                    } catch (e) {
+                        log('wasm-status', `❌ ${test.name}: ${e.message}`, 'error');
+                    }
+                }
+                
+                initWebGPUBtn.disabled = false;
+                log('wasm-status', '🎮 WebGPU WebAssembly ready!', 'success');
+                
+            } catch (error) {
+                log('wasm-status', `❌ WebGPU WebAssembly failed: ${error.message}`, 'error');
+                console.error('Full error:', error);
+            }
+        }
+        
+        // Initialize WebGPU
+        async function initializeWebGPU() {
+            if (!wasmModule) return;
+            
+            try {
+                log('render-status', '🔍 Initializing WebGPU...');
+                
+                // Check WebGPU support
+                if (!navigator.gpu) {
+                    throw new Error('WebGPU not supported');
+                }
+                
+                // Request adapter and device
+                const adapter = await navigator.gpu.requestAdapter({
+                    powerPreference: 'high-performance'
+                });
+                
+                if (!adapter) {
+                    throw new Error('No WebGPU adapter found');
+                }
+                
+                webgpuDevice = await adapter.requestDevice();
+                
+                // Get canvas context
+                webgpuContext = canvas.getContext('webgpu');
+                if (!webgpuContext) {
+                    throw new Error('Failed to get WebGPU context');
+                }
+                
+                // Configure swap chain
+                const swapChainFormat = navigator.gpu.getPreferredCanvasFormat();
+                webgpuContext.configure({
+                    device: webgpuDevice,
+                    format: swapChainFormat,
+                    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+                });
+                
+                // Initialize C++ WebGPU system
+                wasmModule._initialize_webgpu();
+                wasmModule._webgpu_create_device();
+                wasmModule._webgpu_create_swap_chain();
+                
+                log('render-status', '✅ WebGPU initialized successfully', 'success');
+                startRenderBtn.disabled = false;
+                stopRenderBtn.disabled = false;
+                initWebGPUBtn.disabled = true;
+                
+            } catch (error) {
+                log('render-status', `❌ WebGPU initialization failed: ${error.message}`, 'error');
+            }
+        }
+        
+        // Start rendering
+        function startRendering() {
+            if (!wasmModule || !webgpuDevice || isRendering) return;
+            
+            isRendering = true;
+            renderStatus.textContent = 'Rendering...';
+            startRenderBtn.disabled = true;
+            stopRenderBtn.disabled = false;
+            
+            renderLoop();
+            log('render-status', '🎮 Started WebGPU rendering', 'success');
+        }
+        
+        // Stop rendering
+        function stopRendering() {
+            isRendering = false;
+            renderStatus.textContent = 'Stopped';
+            startRenderBtn.disabled = false;
+            stopRenderBtn.disabled = true;
+            
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            
+            log('render-status', '⏹️ Stopped WebGPU rendering', 'info');
+        }
+        
+        // Render loop
+        async function renderLoop() {
+            if (!isRendering) return;
+            
+            const currentTime = performance.now();
+            
+            // Calculate FPS
+            if (lastFrameTime) {
+                const deltaTime = currentTime - lastFrameTime;
+                const fps = Math.round(1000 / deltaTime);
+                frameCount++;
+                
+                if (frameCount % 30 === 0) {
+                    fpsCounter.textContent = `FPS: ${fps}`;
+                }
+            }
+            lastFrameTime = currentTime;
+            
+            try {
+                // Get current texture from swap chain
+                const currentTexture = webgpuContext.getCurrentTexture();
+                
+                // Create command encoder
+                const commandEncoder = webgpuDevice.createCommandEncoder();
+                
+                // Create render pass
+                const renderPassDescriptor = {
+                    colorAttachments: [{
+                        view: currentTexture.createView(),
+                        clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+                        loadOp: 'clear',
+                        storeOp: 'store',
+                    }],
+                };
+                
+                const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+                
+                // Get frame buffer from WebAssembly
+                const frameBufferPtr = wasmModule._get_frame_buffer();
+                const frameBufferData = new Uint8Array(wasmModule.HEAPU8.buffer, frameBufferPtr, 1280 * 720 * 4);
+                
+                // Create simple vertex shader
+                const vertexShaderCode = `
+                    @vertex
+                    fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> @builtin(position) vec4<f32> {
+                        let pos = array<vec2<f32>, 6>(
+                            vec2<f32>(-1.0, -1.0),
+                            vec2<f32>( 1.0, -1.0),
+                            vec2<f32>( 1.0,  1.0),
+                            vec2<f32>(-1.0, -1.0),
+                            vec2<f32>( 1.0,  1.0),
+                            vec2<f32>(-1.0,  1.0)
+                        );
+                        return vec4<f32>(pos[vertexIndex], 0.0, 1.0);
+                    }
+                `;
+                
+                // Create animated fragment shader
+                const frameCounter = frameCount;
+                const fragmentShaderCode = `
+                    @fragment
+                    fn fs_main(@builtin(position) fragCoord: vec4<f32>) -> @location(0) vec4<f32> {
+                        let x = fragCoord.x;
+                        let y = fragCoord.y;
+                        let frame = ` + frameCounter + `.0;
+                        
+                        let r = sin((x + y + frame) * 0.01) * 0.5 + 0.5;
+                        let g = sin((x * 2.0 + frame) * 0.01) * 0.5 + 0.5;
+                        let b = sin((y * 2.0 + frame) * 0.01) * 0.5 + 0.5;
+                        
+                        return vec4<f32>(r, g, b, 1.0);
+                    }
+                `;
+                
+                // Create shaders and pipeline
+                const vertexShader = webgpuDevice.createShaderModule({ code: vertexShaderCode });
+                const fragmentShader = webgpuDevice.createShaderModule({ code: fragmentShaderCode });
+                
+                const pipelineDescriptor = {
+                    layout: 'auto',
+                    vertex: {
+                        module: vertexShader,
+                        entryPoint: 'vs_main',
+                    },
+                    fragment: {
+                        module: fragmentShader,
+                        entryPoint: 'fs_main',
+                        targets: [{
+                            format: navigator.gpu.getPreferredCanvasFormat(),
+                        }],
+                    },
+                    primitive: {
+                        topology: 'triangle-list',
+                    },
+                };
+                
+                const pipeline = webgpuDevice.createRenderPipeline(pipelineDescriptor);
+                
+                // Draw
+                passEncoder.setPipeline(pipeline);
+                passEncoder.draw(6);
+                passEncoder.end();
+                
+                // Submit commands
+                const commandBuffer = commandEncoder.finish();
+                webgpuDevice.queue.submit([commandBuffer]);
+                
+                // Notify C++ that frame was rendered
+                wasmModule._webgpu_render_frame();
+                
+            } catch (error) {
+                console.error('Render error:', error);
+            }
+            
+            animationId = requestAnimationFrame(renderLoop);
+        }
+        
+        // Event listeners
+        initWebGPUBtn.addEventListener('click', initializeWebGPU);
+        startRenderBtn.addEventListener('click', startRendering);
+        stopRenderBtn.addEventListener('click', stopRendering);
+        
+        // Initialize
+        async function init() {
+            await checkWebGPUSupport();
+            await loadWASM();
+        }
+        
+        init();
+    </script>
+</body>
+</html>

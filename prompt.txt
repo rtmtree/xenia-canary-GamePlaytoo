@@ -10,3 +10,13 @@ check if the wasm works at "http://localhost:PORT/" by looking at console if the
 if not, fix the C code.
 then rebuild with " ./build_wasm.sh"
 and keep doing this until the "http://localhost:PORT/" log no error (wasm works)
+
+
+look into C codebase of the Graphic implementation (I think it use Vulkan)
+and try to make it work with WebGPU and expose it to the wasm until it can render on the canvas of the web project
+
+
+you can try running the web project at "http://localhost:PORT/" to see if it works by looking at console if there is error
+if not, fix the C code.
+then rebuild with " ./build_wasm.sh"
+and keep doing this until the "http://localhost:PORT/" log no error (wasm works)

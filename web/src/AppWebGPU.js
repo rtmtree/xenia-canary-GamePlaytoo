@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import RomImporter from './components/RomImporter';
-import GameCanvas from './components/GameCanvas';
+import WebGPUCanvas from './components/WebGPUCanvas';
 import GameControls from './components/GameControls';
 import StatusBar from './components/StatusBar';
-import XeniaWasmLoader from './wasm/XeniaWasmLoader';
+import XeniaWebGPULoader from './wasm/XeniaWebGPULoader';
 
 const AppContainer = styled.div`
   min-height: 100vh;
@@ -58,8 +58,8 @@ const GameContainer = styled.div`
   box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 `;
 
-function App() {
-  const [wasmLoader, setWasmLoader] = useState(null);
+function AppWebGPU() {
+  const [webgpuLoader, setWebgpuLoader] = useState(null);
   const [romData, setRomData] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -67,46 +67,67 @@ function App() {
   const [error, setError] = useState(null);
   const [fps, setFps] = useState(0);
   const [memory, setMemory] = useState(0);
-  const [status, setStatus] = useState('Initializing...');
+  const [status, setStatus] = useState('Initializing WebGPU...');
   const [wasmTest, setWasmTest] = useState('Not tested');
+  const [webgpuInfo, setWebgpuInfo] = useState('');
   const canvasRef = useRef(null);
 
   useEffect(() => {
-    const initializeWasm = async () => {
+    const initializeWebGPU = async () => {
       try {
-        console.log('🔍 Starting WebAssembly initialization...');
-        const loader = new XeniaWasmLoader();
+        console.log('🔍 Starting WebGPU WebAssembly initialization...');
+        setIsLoading(true);
+        setStatus('Loading WebGPU WebAssembly...');
+        
+        const loader = new XeniaWebGPULoader();
         console.log('🔍 Loader created, attempting to load...');
         const success = await loader.load();
         console.log('🔍 Load result:', success);
+        
         if (success) {
-          setWasmLoader(loader);
-          setStatus('Ready');
-          setWasmTest('✅ WebAssembly loaded successfully');
-          console.log('✅ WebAssembly loaded successfully');
+          setWebgpuLoader(loader);
+          setStatus('Initializing WebGPU...');
+          setWasmTest('✅ WebGPU WebAssembly loaded successfully');
+          console.log('✅ WebGPU WebAssembly loaded successfully');
           
           // Test functions
           try {
             const initResult = loader.module._initialize_emulator();
-            const frameBuffer = loader.module._get_frame_buffer();
-            setWasmTest(`✅ Functions working! init: ${initResult}, frameBuffer: ${frameBuffer}`);
+            const webgpuInitResult = loader.module._initialize_webgpu();
+            const info = loader.getWebGPUInfo();
+            setWebgpuInfo(info);
+            setWasmTest(`✅ Functions working! init: ${initResult}, webgpu: ${webgpuInitResult}`);
+            console.log('✅ WebGPU info:', info);
           } catch (e) {
             setWasmTest('❌ Functions failed: ' + e.message);
           }
+          
+          // Initialize WebGPU
+          try {
+            await loader.initializeWebGPU();
+            setStatus('WebGPU Ready');
+            setWasmTest('✅ WebGPU fully initialized!');
+          } catch (webgpuError) {
+            console.error('WebGPU initialization failed:', webgpuError);
+            setStatus('WebGPU Failed - Using Software Rendering');
+            setWasmTest('⚠️ WebGPU failed, using software rendering');
+          }
         } else {
-          setError('Failed to load WebAssembly module');
+          setError('Failed to load WebGPU WebAssembly module');
           setStatus('Error');
-          setWasmTest('❌ WebAssembly load failed');
-          console.error('❌ WebAssembly load failed');
+          setWasmTest('❌ WebGPU WebAssembly load failed');
+          console.error('❌ WebGPU WebAssembly load failed');
         }
       } catch (err) {
-        console.error('❌ WebAssembly initialization error:', err);
-        setError(`WebAssembly initialization failed: ${err.message}`);
+        console.error('❌ WebGPU WebAssembly initialization error:', err);
+        setError(`WebGPU WebAssembly initialization failed: ${err.message}`);
         setStatus('Error');
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    initializeWasm();
+    initializeWebGPU();
   }, []);
 
   const handleRomLoad = (data) => {
@@ -116,28 +137,29 @@ function App() {
   };
 
   const handlePlay = async () => {
-    if (!wasmLoader || !romData) return;
+    if (!webgpuLoader || !romData) return;
 
     try {
       setIsLoading(true);
-      setStatus('Starting game...');
+      setStatus('Starting game with WebGPU...');
 
       // Initialize emulator
-      wasmLoader.initialize();
+      webgpuLoader.initialize();
 
       // Load ROM
-      wasmLoader.loadRom(romData);
+      const romArray = new Uint8Array(romData);
+      webgpuLoader.loadRom(romArray);
 
       // Start emulation
-      wasmLoader.startEmulation();
+      webgpuLoader.startEmulation();
 
       setIsPlaying(true);
       setIsPaused(false);
-      setStatus('Game running');
+      setStatus('Game running with WebGPU');
       setIsLoading(false);
 
-      // Start render loop
-      startRenderLoop();
+      // Start WebGPU render loop
+      startWebGPURenderLoop();
     } catch (err) {
       setError(`Failed to start game: ${err.message}`);
       setStatus('Error');
@@ -146,36 +168,38 @@ function App() {
   };
 
   const handlePause = () => {
-    if (!wasmLoader) return;
+    if (!webgpuLoader) return;
 
     if (isPaused) {
       // Resume
       setIsPaused(false);
-      setStatus('Game running');
-      startRenderLoop();
+      setStatus('Game running with WebGPU');
+      startWebGPURenderLoop();
     } else {
       // Pause
       setIsPaused(true);
       setStatus('Game paused');
-      if (window.animationId) {
-        cancelAnimationFrame(window.animationId);
+      if (window.webgpuAnimationId) {
+        cancelAnimationFrame(window.webgpuAnimationId);
       }
     }
   };
 
   const handleStop = () => {
-    if (!wasmLoader) return;
+    if (!webgpuLoader) return;
 
     try {
-      wasmLoader.stopEmulation();
+      webgpuLoader.stopEmulation();
+
       setIsPlaying(false);
       setIsPaused(false);
       setStatus('Game stopped');
       setFps(0);
       setMemory(0);
 
-      if (window.animationId) {
-        cancelAnimationFrame(window.animationId);
+      if (window.webgpuAnimationId) {
+        cancelAnimationFrame(window.webgpuAnimationId);
+        window.webgpuAnimationId = null;
       }
 
       // Clear canvas
@@ -190,11 +214,11 @@ function App() {
     }
   };
 
-  const startRenderLoop = () => {
+  const startWebGPURenderLoop = () => {
     let lastFrameTime = 0;
     let frameCount = 0;
 
-    const renderFrame = (currentTime) => {
+    const renderFrame = async (currentTime) => {
       if (!isPlaying || isPaused) return;
 
       // Calculate FPS
@@ -209,20 +233,12 @@ function App() {
       }
       lastFrameTime = currentTime;
 
-      // Get frame buffer from WebAssembly and render to canvas
-      const canvas = canvasRef.current;
-      if (canvas && wasmLoader) {
-        const ctx = canvas.getContext('2d');
-        const frameBuffer = wasmLoader.getFrameBuffer();
-        
-        if (frameBuffer) {
-          // Create ImageData from frame buffer
-          const imageData = new ImageData(
-            new Uint8ClampedArray(frameBuffer),
-            canvas.width,
-            canvas.height
-          );
-          ctx.putImageData(imageData, 0, 0);
+      // Render using WebGPU
+      if (webgpuLoader) {
+        try {
+          await webgpuLoader.renderFrame();
+        } catch (error) {
+          console.error('WebGPU render error:', error);
         }
       }
 
@@ -232,10 +248,10 @@ function App() {
         setMemory(memoryUsage);
       }
 
-      window.animationId = requestAnimationFrame(renderFrame);
+      window.webgpuAnimationId = requestAnimationFrame(renderFrame);
     };
 
-    window.animationId = requestAnimationFrame(renderFrame);
+    window.webgpuAnimationId = requestAnimationFrame(renderFrame);
   };
 
   const handleFullscreen = () => {
@@ -259,13 +275,18 @@ function App() {
   return (
     <AppContainer>
       <Header>
-        <Title>Xenia Web Emulator</Title>
-        <Subtitle>Xbox 360 Emulator in the Browser</Subtitle>
+        <Title>Xenia WebGPU Emulator</Title>
+        <Subtitle>Xbox 360 Emulator with WebGPU Graphics</Subtitle>
+        {webgpuInfo && (
+          <div style={{ marginTop: '10px', fontSize: '0.9rem', opacity: 0.8 }}>
+            {webgpuInfo}
+          </div>
+        )}
       </Header>
       
       <Main>
         <ControlsSection>
-          <RomImporter onRomLoad={handleRomLoad} wasmLoader={wasmLoader} />
+          <RomImporter onRomLoad={handleRomLoad} />
           <GameControls
             isPlaying={isPlaying}
             isPaused={isPaused}
@@ -279,11 +300,12 @@ function App() {
         </ControlsSection>
         
         <GameContainer>
-          <GameCanvas
+          <WebGPUCanvas
             ref={canvasRef}
             isLoading={isLoading}
             error={error}
             onRetry={handleErrorRetry}
+            isPlaying={isPlaying}
           />
           <StatusBar
             status={status}
@@ -297,4 +319,4 @@ function App() {
   );
 }
 
-export default App;
+export default AppWebGPU;
