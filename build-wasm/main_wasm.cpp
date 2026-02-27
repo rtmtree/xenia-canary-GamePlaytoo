@@ -30,30 +30,44 @@ extern "C" {
         }
     }
     
-    // Load a ROM chunk
+    // Load a ROM chunk using direct memory transfer
     EMSCRIPTEN_KEEPALIVE
-    int load_rom_chunk(const char* base64_chunk, size_t offset, size_t chunk_size) {
+    int load_rom_chunk_direct(const uint8_t* chunk_data, size_t offset, size_t chunk_size) {
         if (!rom_loading_initialized) return -1;
         
         try {
-            // Decode base64 chunk (simplified - in real implementation would use proper base64 decoding)
-            std::string chunk_str(base64_chunk);
-            std::vector<uint8_t> chunk_data;
-            chunk_data.reserve(chunk_size);
-            
-            // Simple base64 decode (placeholder - would need proper implementation)
-            for (size_t i = 0; i < chunk_str.length(); i++) {
-                chunk_data.push_back(static_cast<uint8_t>(chunk_str[i]));
-            }
-            
             // Ensure rom_data is large enough
-            if (offset + chunk_data.size() > rom_data.size()) {
-                rom_data.resize(offset + chunk_data.size());
+            if (offset + chunk_size > rom_data.size()) {
+                rom_data.resize(offset + chunk_size);
             }
             
-            // Copy chunk data
-            std::copy(chunk_data.begin(), chunk_data.end(), rom_data.begin() + offset);
+            // Copy chunk data directly (no base64 decoding needed)
+            std::copy(chunk_data, chunk_data + chunk_size, rom_data.begin() + offset);
             
+            return 0;
+        } catch (...) {
+            return -1;
+        }
+    }
+    
+    // Write multiple bytes to memory (for batch operations)
+    EMSCRIPTEN_KEEPALIVE
+    int write_bytes_to_memory(uint8_t* address, const char* data, size_t length) {
+        try {
+            for (size_t i = 0; i < length; i++) {
+                address[i] = static_cast<uint8_t>(data[i]);
+            }
+            return 0;
+        } catch (...) {
+            return -1;
+        }
+    }
+    
+    // Write a single byte to memory (for fallback memory access)
+    EMSCRIPTEN_KEEPALIVE
+    int write_byte_to_memory(uint8_t* address, uint8_t value) {
+        try {
+            *address = value;
             return 0;
         } catch (...) {
             return -1;

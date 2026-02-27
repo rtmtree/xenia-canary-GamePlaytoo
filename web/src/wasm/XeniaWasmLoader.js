@@ -157,16 +157,16 @@ class XeniaWasmLoader {
         try {
             console.log(`🔍 Processing ${(data.byteLength / 1024 / 1024).toFixed(1)}MB in chunks...`);
             
-            // Use chunked loading instead of base64 conversion
-            return this.loadRomInChunks(data);
+            // Use direct memory transfer instead of base64
+            return this.loadRomInChunksDirect(data);
         } catch (error) {
             console.error('❌ Error loading ROM via ccall:', error);
             throw error;
         }
     }
     
-    // Load ROM in smaller chunks to avoid string length limits
-    loadRomInChunks(data) {
+    // Load ROM using direct memory transfer to avoid base64 issues
+    loadRomInChunksDirect(data) {
         const bytes = new Uint8Array(data);
         const chunkSize = 10 * 1024 * 1024; // 10MB chunks
         let totalChunks = Math.ceil(bytes.length / chunkSize);
@@ -181,24 +181,36 @@ class XeniaWasmLoader {
             throw new Error('Failed to initialize ROM loading');
         }
         
-        // Load each chunk
+        // Load each chunk using direct memory transfer
         for (let i = 0; i < totalChunks; i++) {
             const start = i * chunkSize;
             const end = Math.min(start + chunkSize, bytes.length);
             const chunk = bytes.slice(start, end);
             
-            // Convert chunk to base64 (much smaller)
-            const base64Chunk = this.arrayBufferToBase64(chunk.buffer);
-            
-            // Load this chunk
-            const chunkResult = this.module.ccall('load_rom_chunk', 'number', 
-                ['string', 'number', 'number'], [base64Chunk, start, chunk.length]);
-            
-            if (chunkResult !== 0) {
-                throw new Error(`Failed to load chunk ${i + 1}/${totalChunks}`);
+            // Allocate memory for this chunk in WASM
+            const chunkPtr = this.module._malloc(chunk.length);
+            if (chunkPtr === 0) {
+                throw new Error(`Failed to allocate memory for chunk ${i + 1}`);
             }
             
-            console.log(`🔍 Loaded chunk ${i + 1}/${totalChunks} (${((i + 1) / totalChunks * 100).toFixed(1)}%)`);
+            try {
+                // Copy chunk data to WASM memory
+                this.copyChunkToWasm(chunk, chunkPtr);
+                
+                // Load this chunk
+                const chunkResult = this.module.ccall('load_rom_chunk_direct', 'number', 
+                    ['number', 'number', 'number'], [chunkPtr, start, chunk.length]);
+                
+                if (chunkResult !== 0) {
+                    throw new Error(`Failed to load chunk ${i + 1}/${totalChunks}`);
+                }
+                
+                console.log(`🔍 Loaded chunk ${i + 1}/${totalChunks} (${((i + 1) / totalChunks * 100).toFixed(1)}%)`);
+                
+            } finally {
+                // Free chunk memory
+                this.module._free(chunkPtr);
+            }
         }
         
         // Finalize ROM loading
@@ -210,6 +222,69 @@ class XeniaWasmLoader {
         
         console.log('🔍 ROM loading completed successfully');
         return 0;
+    }
+    
+    // Copy chunk data to WASM memory using available methods
+    copyChunkToWasm(chunk, ptr) {
+        console.log('🔍 Available memory interfaces:', {
+            HEAPU8: !!this.module.HEAPU8,
+            HEAP8: !!this.module.HEAP8,
+            memory: !!this.module.memory,
+            buffer: this.module.memory ? !!this.module.memory.buffer : false,
+            moduleBuffer: !!this.module.buffer,
+            _malloc: !!this.module._malloc,
+            _free: !!this.module._free
+        });
+        
+        // Try different memory access methods
+        if (this.module.HEAPU8 && this.module.HEAPU8.set) {
+            console.log('🔍 Using HEAPU8.set for memory copy');
+            this.module.HEAPU8.set(chunk, ptr);
+        } else if (this.module.HEAP8 && this.module.HEAP8.set) {
+            console.log('🔍 Using HEAP8.set for memory copy');
+            this.module.HEAP8.set(chunk, ptr);
+        } else if (this.module.memory && this.module.memory.buffer) {
+            console.log('🔍 Using direct memory.buffer for copy');
+            const memoryView = new Uint8Array(this.module.memory.buffer, ptr, chunk.length);
+            memoryView.set(chunk);
+        } else if (this.module.buffer) {
+            console.log('🔍 Using module.buffer for copy');
+            const memoryView = new Uint8Array(this.module.buffer, ptr, chunk.length);
+            memoryView.set(chunk);
+        } else {
+            // Try to access memory through ccall with a different approach
+            console.log('🔍 Trying alternative memory access via ccall');
+            return this.copyChunkViaCcall(chunk, ptr);
+        }
+    }
+    
+    // Alternative method to copy chunk using ccall
+    copyChunkViaCcall(chunk, ptr) {
+        try {
+            // Process chunk in smaller sub-chunks to avoid stack overflow
+            const subChunkSize = 1000; // Process 1000 bytes at a time
+            
+            for (let i = 0; i < chunk.length; i += subChunkSize) {
+                const end = Math.min(i + subChunkSize, chunk.length);
+                const subChunk = chunk.slice(i, end);
+                
+                // Convert sub-chunk to string (much smaller, avoids stack overflow)
+                const subChunkString = String.fromCharCode.apply(null, subChunk);
+                
+                // Write sub-chunk using a batch write function
+                const result = this.module.ccall('write_bytes_to_memory', 'number',
+                    ['number', 'string', 'number'], [ptr + i, subChunkString, subChunk.length]);
+                    
+                if (result !== 0) {
+                    throw new Error(`Failed to write sub-chunk at position ${i}`);
+                }
+            }
+            
+            console.log(`🔍 Copied ${chunk.length} bytes via ccall in ${Math.ceil(chunk.length / subChunkSize)} sub-chunks`);
+        } catch (error) {
+            console.error('❌ Failed to copy via ccall:', error);
+            throw new Error('Cannot copy chunk to WASM memory - no compatible interface found');
+        }
     }
     
     // Helper to convert ArrayBuffer to base64 (for smaller chunks)
