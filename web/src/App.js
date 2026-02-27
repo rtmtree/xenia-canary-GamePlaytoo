@@ -72,6 +72,7 @@ function App() {
   const [status, setStatus] = useState('Initializing...');
   const [wasmTest, setWasmTest] = useState('Not tested');
   const canvasRef = useRef(null);
+  const hasAutoLoadedRom = useRef(false);
 
   useEffect(() => {
     const initializeWasm = async () => {
@@ -96,8 +97,11 @@ function App() {
             setWasmTest('❌ Functions failed: ' + e.message);
           }
 
-          // Auto-load ROM for development ease
-          loadDevelopmentRom();
+          // Auto-load ROM for development ease (only once)
+          if (!hasAutoLoadedRom.current) {
+            hasAutoLoadedRom.current = true;
+            loadDevelopmentRom();
+          }
         } else {
           setError('Failed to load WebAssembly module');
           setStatus('Error');
@@ -158,12 +162,6 @@ function App() {
       console.log(`✅ Development ROM loaded successfully: ${romBuffer.length} bytes`);
       handleRomLoad(romBuffer.buffer);
       
-      // Auto-start the game after ROM is loaded
-      setTimeout(() => {
-        console.log('🎮 Auto-starting game...');
-        handlePlay();
-      }, 1000);
-      
     } catch (error) {
       console.error('❌ Failed to load development ROM:', error);
       setError(`Failed to auto-load ROM: ${error.message}`);
@@ -177,13 +175,23 @@ function App() {
     setStatus('ROM loaded successfully');
   };
 
+  // Auto-start when both WebAssembly and ROM are ready
+  useEffect(() => {
+    if (wasmLoader && romData && !isPlaying && !isLoading) {
+      console.log('🎮 Both WebAssembly and ROM ready, auto-starting game...');
+      setTimeout(() => {
+        handlePlay();
+      }, 1000);
+    }
+  }, [wasmLoader, romData, isPlaying, isLoading]);
+
   const handlePlay = async () => {
     console.log('🎮 Starting game...');
     if (!wasmLoader || !romData) {
+      console.log({ wasmLoader, romData });
       setError('Please load a ROM first');
       return;
     }
-    console.log('🎮 Game started successfully');
 
     try {
       setIsLoading(true);
@@ -207,6 +215,8 @@ function App() {
 
       // Start render loop
       startRenderLoop();
+      
+      console.log('🎮 Game started successfully');
     } catch (err) {
       setError(`Failed to start game: ${err.message}`);
       setStatus('Error');
@@ -289,13 +299,27 @@ function App() {
         const frameBuffer = wasmLoader.getFrameBuffer();
 
         if (frameBuffer) {
-          // Safely acquire the actual ArrayBuffer from WASM memory
-          const wasmMemoryBuffer = wasmLoader.module.HEAPU8?.buffer
-            || wasmLoader.module.memory?.buffer
-            || wasmLoader.module.buffer;
+          // Use the same memory access pattern as XeniaWasmLoader
+          let wasmMemoryBuffer = null;
+          
+          // Try different memory access methods in order of preference
+          if (wasmLoader.module.HEAPU8 && wasmLoader.module.HEAPU8.buffer) {
+            wasmMemoryBuffer = wasmLoader.module.HEAPU8.buffer;
+            console.log('🔍 Using HEAPU8.buffer for frame buffer access');
+          } else if (wasmLoader.module.HEAP8 && wasmLoader.module.HEAP8.buffer) {
+            wasmMemoryBuffer = wasmLoader.module.HEAP8.buffer;
+            console.log('🔍 Using HEAP8.buffer for frame buffer access');
+          } else if (wasmLoader.module.memory && wasmLoader.module.memory.buffer) {
+            wasmMemoryBuffer = wasmLoader.module.memory.buffer;
+            console.log('🔍 Using memory.buffer for frame buffer access');
+          } else if (wasmLoader.module.buffer) {
+            wasmMemoryBuffer = wasmLoader.module.buffer;
+            console.log('🔍 Using module.buffer for frame buffer access');
+          }
 
           if (!wasmMemoryBuffer) {
-            console.error("No compatible memory interface found to read frame buffer!");
+            console.error("❌ No compatible memory interface found to read frame buffer!");
+            console.log("🔍 Available module properties:", Object.getOwnPropertyNames(wasmLoader.module));
             return;
           }
 
