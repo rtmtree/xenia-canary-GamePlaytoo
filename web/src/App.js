@@ -95,6 +95,9 @@ function App() {
           } catch (e) {
             setWasmTest('❌ Functions failed: ' + e.message);
           }
+
+          // Auto-load ROM for development ease
+          loadDevelopmentRom();
         } else {
           setError('Failed to load WebAssembly module');
           setStatus('Error');
@@ -111,6 +114,63 @@ function App() {
     initializeWasm();
   }, []);
 
+  const loadDevelopmentRom = async () => {
+    try {
+      console.log('🔄 Auto-loading development ROM from http://localhost:8000/risk.bin');
+      setStatus('Loading development ROM...');
+      
+      const response = await fetch('http://localhost:8000/risk.bin');
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const contentLength = response.headers.get('Content-Length');
+      const total = contentLength ? parseInt(contentLength, 10) : 0;
+      let loaded = 0;
+      
+      const reader = response.body.getReader();
+      const chunks = [];
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        chunks.push(value);
+        loaded += value.length;
+        
+        if (total > 0) {
+          const progress = (loaded / total * 100).toFixed(1);
+          setStatus(`Loading ROM: ${progress}%`);
+          console.log(`📊 ROM loading progress: ${progress}% (${loaded}/${total} bytes)`);
+        }
+      }
+      
+      // Combine all chunks into a single ArrayBuffer
+      const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+      const romBuffer = new Uint8Array(totalLength);
+      let position = 0;
+      
+      for (const chunk of chunks) {
+        romBuffer.set(chunk, position);
+        position += chunk.length;
+      }
+      
+      console.log(`✅ Development ROM loaded successfully: ${romBuffer.length} bytes`);
+      handleRomLoad(romBuffer.buffer);
+      
+      // Auto-start the game after ROM is loaded
+      setTimeout(() => {
+        console.log('🎮 Auto-starting game...');
+        handlePlay();
+      }, 1000);
+      
+    } catch (error) {
+      console.error('❌ Failed to load development ROM:', error);
+      setError(`Failed to auto-load ROM: ${error.message}`);
+      setStatus('Ready - Please load ROM manually');
+    }
+  };
+
   const handleRomLoad = (data) => {
     setRomData(data);
     setError(null);
@@ -118,7 +178,12 @@ function App() {
   };
 
   const handlePlay = async () => {
-    if (!wasmLoader || !romData) return;
+    console.log('🎮 Starting game...');
+    if (!wasmLoader || !romData) {
+      setError('Please load a ROM first');
+      return;
+    }
+    console.log('🎮 Game started successfully');
 
     try {
       setIsLoading(true);
