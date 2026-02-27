@@ -252,7 +252,21 @@
                 
                 // Get frame buffer from WebAssembly
                 const frameBufferPtr = wasmModule._get_frame_buffer();
-                const frameBufferData = new Uint8Array(wasmModule.HEAPU8.buffer, frameBufferPtr, 1280 * 720 * 4);
+                
+                // Try different memory access methods
+                let wasmMemoryBuffer = null;
+                if (wasmModule.HEAPU8 && wasmModule.HEAPU8.buffer) {
+                    wasmMemoryBuffer = wasmModule.HEAPU8.buffer;
+                } else if (wasmModule.memory && wasmModule.memory.buffer) {
+                    wasmMemoryBuffer = wasmModule.memory.buffer;
+                } else if (wasmModule.buffer) {
+                    wasmMemoryBuffer = wasmModule.buffer;
+                } else {
+                    console.error("No compatible memory interface found to read frame buffer!");
+                    return;
+                }
+                
+                const frameBufferData = new Uint8Array(wasmMemoryBuffer, frameBufferPtr, 1280 * 720 * 4);
                 
                 // Create simple vertex shader
                 const vertexShaderCode = `

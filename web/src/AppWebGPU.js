@@ -62,7 +62,9 @@ function AppWebGPU() {
   const [webgpuLoader, setWebgpuLoader] = useState(null);
   const [romData, setRomData] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const isPlayingRef = useRef(false);
   const [isPaused, setIsPaused] = useState(false);
+  const isPausedRef = useRef(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [fps, setFps] = useState(0);
@@ -78,18 +80,18 @@ function AppWebGPU() {
         console.log('🔍 Starting WebGPU WebAssembly initialization...');
         setIsLoading(true);
         setStatus('Loading WebGPU WebAssembly...');
-        
+
         const loader = new XeniaWebGPULoader();
         console.log('🔍 Loader created, attempting to load...');
         const success = await loader.load();
         console.log('🔍 Load result:', success);
-        
+
         if (success) {
           setWebgpuLoader(loader);
           setStatus('Initializing WebGPU...');
           setWasmTest('✅ WebGPU WebAssembly loaded successfully');
           console.log('✅ WebGPU WebAssembly loaded successfully');
-          
+
           // Test functions
           try {
             const initResult = loader.module._initialize_emulator();
@@ -101,7 +103,7 @@ function AppWebGPU() {
           } catch (e) {
             setWasmTest('❌ Functions failed: ' + e.message);
           }
-          
+
           // Initialize WebGPU
           try {
             await loader.initializeWebGPU();
@@ -154,7 +156,9 @@ function AppWebGPU() {
       webgpuLoader.startEmulation();
 
       setIsPlaying(true);
+      isPlayingRef.current = true;
       setIsPaused(false);
+      isPausedRef.current = false;
       setStatus('Game running with WebGPU');
       setIsLoading(false);
 
@@ -170,14 +174,16 @@ function AppWebGPU() {
   const handlePause = () => {
     if (!webgpuLoader) return;
 
-    if (isPaused) {
+    if (isPausedRef.current) {
       // Resume
       setIsPaused(false);
+      isPausedRef.current = false;
       setStatus('Game running with WebGPU');
       startWebGPURenderLoop();
     } else {
       // Pause
       setIsPaused(true);
+      isPausedRef.current = true;
       setStatus('Game paused');
       if (window.webgpuAnimationId) {
         cancelAnimationFrame(window.webgpuAnimationId);
@@ -192,7 +198,9 @@ function AppWebGPU() {
       webgpuLoader.stopEmulation();
 
       setIsPlaying(false);
+      isPlayingRef.current = false;
       setIsPaused(false);
+      isPausedRef.current = false;
       setStatus('Game stopped');
       setFps(0);
       setMemory(0);
@@ -219,7 +227,7 @@ function AppWebGPU() {
     let frameCount = 0;
 
     const renderFrame = async (currentTime) => {
-      if (!isPlaying || isPaused) return;
+      if (!isPlayingRef.current || isPausedRef.current) return;
 
       // Calculate FPS
       if (lastFrameTime) {
@@ -283,7 +291,7 @@ function AppWebGPU() {
           </div>
         )}
       </Header>
-      
+
       <Main>
         <ControlsSection>
           <RomImporter onRomLoad={handleRomLoad} />
@@ -298,7 +306,7 @@ function AppWebGPU() {
             onFullscreen={handleFullscreen}
           />
         </ControlsSection>
-        
+
         <GameContainer>
           <WebGPUCanvas
             ref={canvasRef}

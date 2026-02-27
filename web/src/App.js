@@ -62,7 +62,9 @@ function App() {
   const [wasmLoader, setWasmLoader] = useState(null);
   const [romData, setRomData] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const isPlayingRef = useRef(false);
   const [isPaused, setIsPaused] = useState(false);
+  const isPausedRef = useRef(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [fps, setFps] = useState(0);
@@ -84,7 +86,7 @@ function App() {
           setStatus('Ready');
           setWasmTest('✅ WebAssembly loaded successfully');
           console.log('✅ WebAssembly loaded successfully');
-          
+
           // Test functions
           try {
             const initResult = loader.module._initialize_emulator();
@@ -132,7 +134,9 @@ function App() {
       wasmLoader.startEmulation();
 
       setIsPlaying(true);
+      isPlayingRef.current = true;
       setIsPaused(false);
+      isPausedRef.current = false;
       setStatus('Game running');
       setIsLoading(false);
 
@@ -148,14 +152,16 @@ function App() {
   const handlePause = () => {
     if (!wasmLoader) return;
 
-    if (isPaused) {
+    if (isPausedRef.current) {
       // Resume
       setIsPaused(false);
+      isPausedRef.current = false;
       setStatus('Game running');
       startRenderLoop();
     } else {
       // Pause
       setIsPaused(true);
+      isPausedRef.current = true;
       setStatus('Game paused');
       if (window.animationId) {
         cancelAnimationFrame(window.animationId);
@@ -169,7 +175,9 @@ function App() {
     try {
       wasmLoader.stopEmulation();
       setIsPlaying(false);
+      isPlayingRef.current = false;
       setIsPaused(false);
+      isPausedRef.current = false;
       setStatus('Game stopped');
       setFps(0);
       setMemory(0);
@@ -195,7 +203,7 @@ function App() {
     let frameCount = 0;
 
     const renderFrame = (currentTime) => {
-      if (!isPlaying || isPaused) return;
+      if (!isPlayingRef.current || isPausedRef.current) return;
 
       // Calculate FPS
       if (lastFrameTime) {
@@ -214,11 +222,25 @@ function App() {
       if (canvas && wasmLoader) {
         const ctx = canvas.getContext('2d');
         const frameBuffer = wasmLoader.getFrameBuffer();
-        
+
         if (frameBuffer) {
-          // Create ImageData from frame buffer
+          // Safely acquire the actual ArrayBuffer from WASM memory
+          const wasmMemoryBuffer = wasmLoader.module.HEAPU8?.buffer
+            || wasmLoader.module.memory?.buffer
+            || wasmLoader.module.buffer;
+
+          if (!wasmMemoryBuffer) {
+            console.error("No compatible memory interface found to read frame buffer!");
+            return;
+          }
+
+          // Create ImageData from frame buffer memory
           const imageData = new ImageData(
-            new Uint8ClampedArray(frameBuffer),
+            new Uint8ClampedArray(
+              wasmMemoryBuffer,
+              frameBuffer,
+              canvas.width * canvas.height * 4
+            ),
             canvas.width,
             canvas.height
           );
@@ -262,7 +284,7 @@ function App() {
         <Title>Xenia Web Emulator</Title>
         <Subtitle>Xbox 360 Emulator in the Browser</Subtitle>
       </Header>
-      
+
       <Main>
         <ControlsSection>
           <RomImporter onRomLoad={handleRomLoad} wasmLoader={wasmLoader} />
@@ -277,7 +299,7 @@ function App() {
             onFullscreen={handleFullscreen}
           />
         </ControlsSection>
-        
+
         <GameContainer>
           <GameCanvas
             ref={canvasRef}

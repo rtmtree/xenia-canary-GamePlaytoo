@@ -20,3 +20,29 @@ you can try running the web project at "http://localhost:PORT/" to see if it wor
 if not, fix the C code.
 then rebuild with " ./build_wasm.sh"
 and keep doing this until the "http://localhost:PORT/" log no error (wasm works)
+
+
+
+
+
+
+
+the web build of xenia project at @beautifulMention can now load rom and log
+
+🔍 Trying alternative memory access via ccall
+VM6:63 🔍 Copied 10485760 bytes via ccall in 10486 sub-chunks
+VM6:63 🔍 Loaded chunk 76/78 (97.4%)
+VM6:63 🔍 Available memory interfaces: {HEAPU8: false, HEAP8: false, memory: false, buffer: false, moduleBuffer: false, …}
+VM6:63 🔍 Trying alternative memory access via ccall
+VM6:63 🔍 Copied 10485760 bytes via ccall in 10486 sub-chunks
+VM6:63 🔍 Loaded chunk 77/78 (98.7%)
+VM6:63 🔍 Available memory interfaces: {HEAPU8: false, HEAP8: false, memory: false, buffer: false, moduleBuffer: false, …}
+VM6:63 🔍 Trying alternative memory access via ccall
+VM6:63 🔍 Copied 1835008 bytes via ccall in 1836 sub-chunks
+VM6:63 🔍 Loaded chunk 78/78 (100.0%)
+VM6:63 🔍 ROM loading completed successfully
+
+
+
+but the canvas is still blank.
+make it render the game like what it does with Vulkan on other build

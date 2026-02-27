@@ -147,25 +147,26 @@ const WebGPUCanvasComponent = React.forwardRef(({ isLoading, error, onRetry, isP
   return (
     <CanvasContainer>
       <WebGPUCanvas
+        id="game-canvas"
         ref={canvasRef}
         width={1280}
         height={720}
       />
-      
+
       {isLoading && (
         <LoadingOverlay>
           <Spinner />
           <p>Initializing WebGPU...</p>
         </LoadingOverlay>
       )}
-      
+
       {error && (
         <ErrorOverlay>
           <ErrorMessage>{error}</ErrorMessage>
           <RetryButton onClick={onRetry}>Retry</RetryButton>
         </ErrorOverlay>
       )}
-      
+
       {webgpuSupported === false && !isLoading && !error && (
         <div style={{
           position: 'absolute',
@@ -180,7 +181,7 @@ const WebGPUCanvasComponent = React.forwardRef(({ isLoading, error, onRetry, isP
           WebGPU Not Supported
         </div>
       )}
-      
+
       {webgpuSupported === true && !isLoading && !error && (
         <div style={{
           position: 'absolute',
