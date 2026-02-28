@@ -57,6 +57,9 @@ class WebGPUCommandProcessor : public CommandProcessor {
   void Shutdown() override;
   void ClearCaches() override;
 
+  void IssueSwap(uint32_t frontbuffer_ptr, uint32_t frontbuffer_width,
+                 uint32_t frontbuffer_height) override;
+
   // WebGPU-specific methods
   WGPUDevice GetDevice() const { return device_; }
   WGPUQueue GetQueue() const { return queue_; }

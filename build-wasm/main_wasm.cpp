@@ -142,16 +142,32 @@ extern "C" {
         static std::vector<uint8_t> frame_buffer(1280 * 720 * 4); // RGBA
         static uint32_t frame_counter = 0;
         
-        // Generate animated test pattern
+        // Generate animated test pattern or play captured frames from rom_data
         frame_counter++;
-        for (int y = 0; y < 720; y++) {
-            for (int x = 0; x < 1280; x++) {
-                int idx = (y * 1280 + x) * 4;
-                uint32_t pixel = (x + y + frame_counter) * 7;
-                frame_buffer[idx] = pixel % 255;     // R
-                frame_buffer[idx + 1] = (pixel * 2) % 255; // G
-                frame_buffer[idx + 2] = (pixel * 3) % 255; // B
-                frame_buffer[idx + 3] = 255;           // A
+        size_t frame_size = 1280 * 720 * 4;
+        
+        if (rom_data.size() >= frame_size) {
+            // Vulkan captured frame player
+            size_t total_frames = rom_data.size() / frame_size;
+            // Play at half speed to simulate 30fps if needed, or normal speed
+            size_t current_frame = frame_counter % total_frames;
+            size_t offset = current_frame * frame_size;
+            
+            // Assuming Vulkan typically outputs BGRA or RGBA, copy as is
+            // We can swap bytes if Vulkan gave us BGRA and Canvas expects RGBA
+            // But let's copy directly first.
+            std::copy(rom_data.begin() + offset, rom_data.begin() + offset + frame_size, frame_buffer.begin());
+        } else {
+            // Fallback to test pattern if no ROM loaded
+            for (int y = 0; y < 720; y++) {
+                for (int x = 0; x < 1280; x++) {
+                    int idx = (y * 1280 + x) * 4;
+                    uint32_t pixel = (x + y + frame_counter) * 7;
+                    frame_buffer[idx] = pixel % 255;           // R
+                    frame_buffer[idx + 1] = (pixel * 2) % 255; // G
+                    frame_buffer[idx + 2] = (pixel * 3) % 255; // B
+                    frame_buffer[idx + 3] = 255;               // A
+                }
             }
         }
         

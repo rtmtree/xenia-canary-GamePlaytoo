@@ -1,7 +1,7 @@
 // This code implements the `-sMODULARIZE` settings by taking the generated
 // JS program code (INNER_JS_CODE) and wrapping it in a factory function.
 
-// When targeting node and ES6 we use `await import ..` in the generated code
+// When targetting node and ES6 we use `await import ..` in the generated code
 // so the outer function needs to be marked as async.
 async function XeniaWasm(moduleArg = {}) {
   var moduleRtn;
@@ -37,7 +37,7 @@ async function XeniaWasm(moduleArg = {}) {
     return;
   }
 
-  var currentSafariVersion = userAgent.includes("Safari/") && !userAgent.includes("Chrome/") && userAgent.match(/Version\/(\d+\.?\d*\.?\d*)/) ? humanReadableVersionToPacked(userAgent.match(/Version\/(\d+\.?\d*\.?\d*)/)[1]) : TARGET_NOT_SUPPORTED;
+  var currentSafariVersion = userAgent.includes("Safari/") && userAgent.match(/Version\/(\d+\.?\d*\.?\d*)/) ? humanReadableVersionToPacked(userAgent.match(/Version\/(\d+\.?\d*\.?\d*)/)[1]) : TARGET_NOT_SUPPORTED;
   if (currentSafariVersion < 150000) {
     throw new Error(`This emscripten-generated code requires Safari v${ packedVersionToHumanReadable(150000) } (detected v${currentSafariVersion})`);
   }
@@ -72,13 +72,10 @@ var Module = moduleArg;
 // Determine the runtime environment we are in. You can customize this by
 // setting the ENVIRONMENT setting at compile time (see settings.js).
 
-// Attempt to auto-detect the environment
-var ENVIRONMENT_IS_WEB = !!globalThis.window;
-var ENVIRONMENT_IS_WORKER = !!globalThis.WorkerGlobalScope;
-// N.b. Electron.js environment is simultaneously a NODE-environment, but
-// also a web environment.
-var ENVIRONMENT_IS_NODE = globalThis.process?.versions?.node && globalThis.process?.type != 'renderer';
-var ENVIRONMENT_IS_SHELL = !ENVIRONMENT_IS_WEB && !ENVIRONMENT_IS_NODE && !ENVIRONMENT_IS_WORKER;
+var ENVIRONMENT_IS_WEB = true;
+var ENVIRONMENT_IS_WORKER = false;
+var ENVIRONMENT_IS_NODE = false;
+var ENVIRONMENT_IS_SHELL = false;
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
@@ -190,7 +187,7 @@ if (!globalThis.WebAssembly) {
 var ABORT = false;
 
 // set by exit() and abort().  Passed to 'onExit' handler.
-// NOTE: This is also used as the process return code in shell environments
+// NOTE: This is also used as the process return code code in shell environments
 // but only when noExitRuntime is false.
 var EXITSTATUS;
 
@@ -369,9 +366,9 @@ var runtimeInitialized = false;
 
 function updateMemoryViews() {
   var b = wasmMemory.buffer;
-  HEAP8 = new Int8Array(b);
+  Module['HEAP8'] = HEAP8 = new Int8Array(b);
   HEAP16 = new Int16Array(b);
-  HEAPU8 = new Uint8Array(b);
+  Module['HEAPU8'] = HEAPU8 = new Uint8Array(b);
   HEAPU16 = new Uint16Array(b);
   HEAP32 = new Int32Array(b);
   HEAPU32 = new Uint32Array(b);
@@ -513,7 +510,7 @@ function getBinarySync(file) {
   if (readBinary) {
     return readBinary(file);
   }
-  // Throwing a plain string here, even though it not normally advisable since
+  // Throwing a plain string here, even though it not normally adviables since
   // this gets turning into an `abort` in instantiateArrayBuffer.
   throw 'sync fetching of the wasm failed: you can preload it to Module["wasmBinary"] manually, or emcc.py will do that for you when generating HTML (but not JS)';
 }
@@ -599,7 +596,7 @@ function createWasm() {
   return receiveInstance(result[0]);
 }
 
-var compilerSettings = {"ASSERTIONS":1,"STACK_OVERFLOW_CHECK":1,"CHECK_NULL_WRITES":true,"VERBOSE":false,"INVOKE_RUN":0,"EXIT_RUNTIME":false,"STACK_SIZE":65536,"MALLOC":"dlmalloc","ABORTING_MALLOC":0,"INITIAL_HEAP":16777216,"INITIAL_MEMORY":-1,"MAXIMUM_MEMORY":2147483648,"ALLOW_MEMORY_GROWTH":1,"MEMORY_GROWTH_GEOMETRIC_STEP":0.2,"MEMORY_GROWTH_GEOMETRIC_CAP":100663296,"MEMORY_GROWTH_LINEAR_STEP":-1,"MEMORY64":0,"INITIAL_TABLE":-1,"ALLOW_TABLE_GROWTH":false,"GLOBAL_BASE":1024,"TABLE_BASE":1,"USE_CLOSURE_COMPILER":false,"CLOSURE_WARNINGS":"quiet","IGNORE_CLOSURE_COMPILER_ERRORS":false,"DECLARE_ASM_MODULE_EXPORTS":true,"INLINING_LIMIT":false,"SUPPORT_BIG_ENDIAN":false,"SAFE_HEAP":0,"SAFE_HEAP_LOG":false,"EMULATE_FUNCTION_POINTER_CASTS":false,"EXCEPTION_DEBUG":false,"LIBRARY_DEBUG":false,"SYSCALL_DEBUG":false,"SOCKET_DEBUG":false,"DYLINK_DEBUG":0,"FS_DEBUG":false,"SOCKET_WEBRTC":false,"WEBSOCKET_URL":"ws://","PROXY_POSIX_SOCKETS":false,"WEBSOCKET_SUBPROTOCOL":"binary","OPENAL_DEBUG":false,"WEBSOCKET_DEBUG":false,"GL_ASSERTIONS":false,"TRACE_WEBGL_CALLS":false,"GL_DEBUG":false,"GL_TESTING":false,"GL_MAX_TEMP_BUFFER_SIZE":2097152,"GL_UNSAFE_OPTS":true,"FULL_ES2":false,"GL_EMULATE_GLES_VERSION_STRING_FORMAT":true,"GL_EXTENSIONS_IN_PREFIXED_FORMAT":true,"GL_SUPPORT_AUTOMATIC_ENABLE_EXTENSIONS":true,"GL_SUPPORT_SIMPLE_ENABLE_EXTENSIONS":true,"GL_TRACK_ERRORS":true,"GL_SUPPORT_EXPLICIT_SWAP_CONTROL":false,"GL_POOL_TEMP_BUFFERS":true,"GL_EXPLICIT_UNIFORM_LOCATION":false,"GL_EXPLICIT_UNIFORM_BINDING":false,"USE_WEBGL2":false,"MIN_WEBGL_VERSION":1,"MAX_WEBGL_VERSION":1,"WEBGL2_BACKWARDS_COMPATIBILITY_EMULATION":false,"FULL_ES3":false,"LEGACY_GL_EMULATION":false,"GL_FFP_ONLY":false,"GL_PREINITIALIZED_CONTEXT":false,"STB_IMAGE":false,"GL_DISABLE_HALF_FLOAT_EXTENSION_IF_BROKEN":false,"GL_WORKAROUND_SAFARI_GETCONTEXT_BUG":true,"GL_ENABLE_GET_PROC_ADDRESS":true,"JS_MATH":false,"POLYFILL_OLD_MATH_FUNCTIONS":false,"LEGACY_VM_SUPPORT":false,"ENVIRONMENT":["web"],"LZ4":false,"DISABLE_EXCEPTION_CATCHING":1,"EXCEPTION_CATCHING_ALLOWED":[],"DISABLE_EXCEPTION_THROWING":false,"EXPORT_EXCEPTION_HANDLING_HELPERS":false,"EXCEPTION_STACK_TRACES":false,"WASM_LEGACY_EXCEPTIONS":true,"ASYNCIFY":0,"ASYNCIFY_IMPORTS":[],"ASYNCIFY_IGNORE_INDIRECT":false,"ASYNCIFY_STACK_SIZE":4096,"ASYNCIFY_REMOVE":[],"ASYNCIFY_ADD":[],"ASYNCIFY_PROPAGATE_ADD":true,"ASYNCIFY_ONLY":[],"ASYNCIFY_ADVISE":false,"ASYNCIFY_DEBUG":0,"ASYNCIFY_EXPORTS":[],"JSPI":0,"JSPI_EXPORTS":[],"JSPI_IMPORTS":[],"EXPORTED_RUNTIME_METHODS":{},"INCOMING_MODULE_JS_API":{},"CASE_INSENSITIVE_FS":false,"FILESYSTEM":true,"FORCE_FILESYSTEM":false,"NODERAWFS":false,"NODE_HOST_ENV":false,"NODE_CODE_CACHING":false,"EXPORTED_FUNCTIONS":{},"EXPORT_ALL":false,"EXPORT_KEEPALIVE":true,"RETAIN_COMPILER_SETTINGS":1,"DEFAULT_LIBRARY_FUNCS_TO_INCLUDE":["$ExitStatus","$addOnPostRun","$addOnPreRun","$callRuntimeCallbacks","$getValue","$noExitRuntime","$ptrToString","$setValue","$stackRestore","$stackSave","$warnOnce","$wasmMemory","__cxa_throw","_abort_js","_embind_register_bigint","_embind_register_bool","_embind_register_emval","_embind_register_float","_embind_register_integer","_embind_register_memory_view","_embind_register_std_string","_embind_register_std_wstring","_embind_register_void","emscripten_resize_heap","fd_close","fd_seek","fd_write","$ccall","$cwrap"],"INCLUDE_FULL_LIBRARY":false,"RELOCATABLE":false,"MAIN_MODULE":0,"SIDE_MODULE":0,"RUNTIME_LINKED_LIBS":[],"BUILD_AS_WORKER":false,"PROXY_TO_PTHREAD":false,"LINKABLE":false,"STRICT":false,"IGNORE_MISSING_MAIN":true,"STRICT_JS":false,"WARN_ON_UNDEFINED_SYMBOLS":0,"ERROR_ON_UNDEFINED_SYMBOLS":0,"SMALL_XHR_CHUNKS":false,"DETERMINISTIC":false,"MODULARIZE":1,"EXPORT_ES6":1,"EXPORT_NAME":"XeniaWasm","DYNAMIC_EXECUTION":1,"BOOTSTRAPPING_STRUCT_INFO":false,"EMSCRIPTEN_TRACING":false,"USE_GLFW":0,"WASM":1,"STANDALONE_WASM":false,"BINARYEN_IGNORE_IMPLICIT_TRAPS":false,"BINARYEN_EXTRA_PASSES":"","WASM_ASYNC_COMPILATION":0,"DYNCALLS":false,"WASM_BIGINT":true,"EMIT_PRODUCERS_SECTION":false,"EMIT_EMSCRIPTEN_LICENSE":false,"LEGALIZE_JS_FFI":0,"USE_SDL":0,"USE_SDL_GFX":0,"USE_SDL_IMAGE":1,"USE_SDL_TTF":1,"USE_SDL_NET":1,"USE_ICU":false,"USE_ZLIB":false,"USE_BZIP2":false,"USE_GIFLIB":false,"USE_LIBJPEG":false,"USE_LIBPNG":false,"USE_REGAL":false,"USE_BOOST_HEADERS":false,"USE_BULLET":false,"USE_VORBIS":false,"USE_OGG":false,"USE_MPG123":false,"USE_FREETYPE":false,"USE_SDL_MIXER":1,"USE_HARFBUZZ":false,"USE_COCOS2D":0,"USE_MODPLUG":false,"SDL2_IMAGE_FORMATS":[],"SDL2_MIXER_FORMATS":["ogg"],"USE_SQLITE3":false,"SHARED_MEMORY":false,"WASM_WORKERS":0,"AUDIO_WORKLET":0,"AUDIO_WORKLET_SUPPORT_AUDIO_PARAMS":true,"WEBAUDIO_DEBUG":0,"PTHREAD_POOL_SIZE":0,"PTHREAD_POOL_SIZE_STRICT":1,"PTHREAD_POOL_DELAY_LOAD":false,"DEFAULT_PTHREAD_STACK_SIZE":0,"PTHREADS_PROFILING":false,"ALLOW_BLOCKING_ON_MAIN_THREAD":true,"PTHREADS_DEBUG":false,"EVAL_CTORS":0,"TEXTDECODER":1,"EMBIND_STD_STRING_IS_UTF8":true,"EMBIND_AOT":false,"OFFSCREENCANVAS_SUPPORT":false,"OFFSCREENCANVASES_TO_PTHREAD":"#canvas","OFFSCREEN_FRAMEBUFFER":false,"FETCH_SUPPORT_INDEXEDDB":true,"FETCH_DEBUG":false,"FETCH":false,"FETCH_STREAMING":0,"WASMFS":false,"SINGLE_FILE":false,"SINGLE_FILE_BINARY_ENCODE":true,"AUTO_JS_LIBRARIES":true,"AUTO_NATIVE_LIBRARIES":true,"MIN_FIREFOX_VERSION":79,"MIN_SAFARI_VERSION":150000,"MIN_CHROME_VERSION":85,"MIN_NODE_VERSION":2147483647,"MINIMAL_RUNTIME":0,"MINIMAL_RUNTIME_STREAMING_WASM_COMPILATION":false,"MINIMAL_RUNTIME_STREAMING_WASM_INSTANTIATION":false,"SUPPORT_LONGJMP":"emscripten","DISABLE_DEPRECATED_FIND_EVENT_TARGET_BEHAVIOR":true,"HTML5_SUPPORT_DEFERRING_USER_SENSITIVE_REQUESTS":true,"MINIFY_HTML":true,"ASAN_SHADOW_SIZE":-1,"SOURCE_MAP_PREFIXES":[],"DEFAULT_TO_CXX":true,"PRINTF_LONG_DOUBLE":false,"SEPARATE_DWARF_URL":"","ERROR_ON_WASM_CHANGES_AFTER_LINK":false,"ABORT_ON_WASM_EXCEPTIONS":false,"PURE_WASI":false,"IMPORTED_MEMORY":false,"SPLIT_MODULE":false,"AUTOLOAD_DYLIBS":true,"ALLOW_UNIMPLEMENTED_SYSCALLS":true,"TRUSTED_TYPES":false,"POLYFILL":true,"RUNTIME_DEBUG":0,"LEGACY_RUNTIME":false,"SIGNATURE_CONVERSIONS":[],"SOURCE_PHASE_IMPORTS":false,"WASM_ESM_INTEGRATION":false,"JS_BASE64_API":false,"GROWABLE_ARRAYBUFFERS":false,"WASM_JS_TYPES":false,"CROSS_ORIGIN":false,"FAKE_DYLIBS":true,"EXECUTABLE":false,"BINARYEN":1,"TOTAL_STACK":65536,"BINARYEN_ASYNC_COMPILATION":0,"UNALIGNED_MEMORY":0,"FORCE_ALIGNED_MEMORY":0,"PGO":0,"QUANTUM_SIZE":4,"FUNCTION_POINTER_ALIGNMENT":2,"RESERVED_FUNCTION_POINTERS":false,"BUILD_AS_SHARED_LIB":0,"SAFE_SPLIT_MEMORY":0,"SPLIT_MEMORY":0,"BINARYEN_METHOD":"native-wasm","BINARYEN_TRAP_MODE":-1,"PRECISE_I64_MATH":1,"MEMFS_APPEND_TO_TYPED_ARRAYS":1,"ERROR_ON_MISSING_LIBRARIES":1,"EMITTING_JS":1,"SKIP_STACK_IN_SMALL":0,"SAFE_STACK":0,"MEMORY_GROWTH_STEP":-1,"ELIMINATE_DUPLICATE_FUNCTIONS":0,"ELIMINATE_DUPLICATE_FUNCTIONS_DUMP_EQUIVALENT_FUNCTIONS":0,"ELIMINATE_DUPLICATE_FUNCTIONS_PASSES":5,"WASM_OBJECT_FILES":1,"TOTAL_MEMORY":-1,"WASM_MEM_MAX":2147483648,"BINARYEN_MEM_MAX":2147483648,"BINARYEN_PASSES":"","SWAPPABLE_ASM_MODULE":0,"ASM_JS":1,"FINALIZE_ASM_JS":0,"ASYNCIFY_WHITELIST":[],"ASYNCIFY_BLACKLIST":[],"EXCEPTION_CATCHING_WHITELIST":[],"SEPARATE_ASM":0,"SEPARATE_ASM_MODULE_NAME":"","FAST_UNROLLED_MEMCPY_AND_MEMSET":0,"DOUBLE_MODE":0,"PRECISE_F32":0,"ALIASING_FUNCTION_POINTERS":0,"AGGRESSIVE_VARIABLE_ELIMINATION":0,"SIMPLIFY_IFS":1,"DEAD_FUNCTIONS":[],"WASM_BACKEND":-1,"EXPORT_BINDINGS":0,"RUNNING_JS_OPTS":0,"EXPORT_FUNCTION_TABLES":0,"BINARYEN_SCRIPTS":"","WARN_UNALIGNED":0,"ASM_PRIMITIVE_VARS":[],"WORKAROUND_IOS_9_RIGHT_SHIFT_BUG":0,"RUNTIME_FUNCS_TO_IMPORT":[],"LIBRARY_DEPS_TO_AUTOEXPORT":[],"EMIT_EMSCRIPTEN_METADATA":0,"SHELL_FILE":"","LLD_REPORT_UNDEFINED":1,"MEM_INIT_METHOD":0,"USE_PTHREADS":0,"USES_DYNAMIC_ALLOC":1,"REVERSE_DEPS":"auto","RUNTIME_LOGGING":0,"MIN_EDGE_VERSION":2147483647,"MIN_IE_VERSION":2147483647,"WORKAROUND_OLD_WEBGL_UNIFORM_UPLOAD_IGNORED_OFFSET_BUG":0,"AUTO_ARCHIVE_INDEXES":0,"USE_ES6_IMPORT_META":1,"EXTRA_EXPORTED_RUNTIME_METHODS":[],"SUPPORT_ERRNO":0,"DEMANGLE_SUPPORT":0,"MAYBE_WASM2JS":0,"HEADLESS":0,"USE_OFFSET_COVERTER":0,"ASYNCIFY_LAZY_LOAD_CODE":0,"USE_WEBGPU":0,"PROXY_TO_WORKER":0,"NODEJS_CATCH_EXIT":0,"NODEJS_CATCH_REJECTION":0,"EMSCRIPTEN_VERSION":"5.0.2"} ;
+var compilerSettings = {"ASSERTIONS":1,"STACK_OVERFLOW_CHECK":1,"CHECK_NULL_WRITES":true,"VERBOSE":false,"INVOKE_RUN":0,"EXIT_RUNTIME":false,"STACK_SIZE":65536,"MALLOC":"dlmalloc","ABORTING_MALLOC":0,"INITIAL_HEAP":16777216,"INITIAL_MEMORY":-1,"MAXIMUM_MEMORY":2147483648,"ALLOW_MEMORY_GROWTH":1,"MEMORY_GROWTH_GEOMETRIC_STEP":0.2,"MEMORY_GROWTH_GEOMETRIC_CAP":100663296,"MEMORY_GROWTH_LINEAR_STEP":-1,"MEMORY64":0,"INITIAL_TABLE":-1,"ALLOW_TABLE_GROWTH":false,"GLOBAL_BASE":1024,"TABLE_BASE":1,"USE_CLOSURE_COMPILER":false,"CLOSURE_WARNINGS":"quiet","IGNORE_CLOSURE_COMPILER_ERRORS":false,"DECLARE_ASM_MODULE_EXPORTS":true,"INLINING_LIMIT":false,"SUPPORT_BIG_ENDIAN":false,"SAFE_HEAP":0,"SAFE_HEAP_LOG":false,"EMULATE_FUNCTION_POINTER_CASTS":false,"EXCEPTION_DEBUG":false,"LIBRARY_DEBUG":false,"SYSCALL_DEBUG":false,"SOCKET_DEBUG":false,"DYLINK_DEBUG":0,"FS_DEBUG":false,"SOCKET_WEBRTC":false,"WEBSOCKET_URL":"ws://","PROXY_POSIX_SOCKETS":false,"WEBSOCKET_SUBPROTOCOL":"binary","OPENAL_DEBUG":false,"WEBSOCKET_DEBUG":false,"GL_ASSERTIONS":false,"TRACE_WEBGL_CALLS":false,"GL_DEBUG":false,"GL_TESTING":false,"GL_MAX_TEMP_BUFFER_SIZE":2097152,"GL_UNSAFE_OPTS":true,"FULL_ES2":false,"GL_EMULATE_GLES_VERSION_STRING_FORMAT":true,"GL_EXTENSIONS_IN_PREFIXED_FORMAT":true,"GL_SUPPORT_AUTOMATIC_ENABLE_EXTENSIONS":true,"GL_SUPPORT_SIMPLE_ENABLE_EXTENSIONS":true,"GL_TRACK_ERRORS":true,"GL_SUPPORT_EXPLICIT_SWAP_CONTROL":false,"GL_POOL_TEMP_BUFFERS":true,"GL_EXPLICIT_UNIFORM_LOCATION":false,"GL_EXPLICIT_UNIFORM_BINDING":false,"USE_WEBGL2":false,"MIN_WEBGL_VERSION":1,"MAX_WEBGL_VERSION":1,"WEBGL2_BACKWARDS_COMPATIBILITY_EMULATION":false,"FULL_ES3":false,"LEGACY_GL_EMULATION":false,"GL_FFP_ONLY":false,"GL_PREINITIALIZED_CONTEXT":false,"STB_IMAGE":false,"GL_DISABLE_HALF_FLOAT_EXTENSION_IF_BROKEN":false,"GL_WORKAROUND_SAFARI_GETCONTEXT_BUG":true,"GL_ENABLE_GET_PROC_ADDRESS":true,"JS_MATH":false,"POLYFILL_OLD_MATH_FUNCTIONS":false,"LEGACY_VM_SUPPORT":false,"ENVIRONMENT":["web"],"LZ4":false,"DISABLE_EXCEPTION_CATCHING":1,"EXCEPTION_CATCHING_ALLOWED":[],"DISABLE_EXCEPTION_THROWING":false,"EXPORT_EXCEPTION_HANDLING_HELPERS":false,"EXCEPTION_STACK_TRACES":false,"WASM_LEGACY_EXCEPTIONS":true,"NODEJS_CATCH_EXIT":false,"NODEJS_CATCH_REJECTION":0,"ASYNCIFY":0,"ASYNCIFY_IMPORTS":[],"ASYNCIFY_IGNORE_INDIRECT":false,"ASYNCIFY_STACK_SIZE":4096,"ASYNCIFY_REMOVE":[],"ASYNCIFY_ADD":[],"ASYNCIFY_PROPAGATE_ADD":true,"ASYNCIFY_ONLY":[],"ASYNCIFY_ADVISE":false,"ASYNCIFY_DEBUG":0,"ASYNCIFY_EXPORTS":[],"JSPI":0,"JSPI_EXPORTS":[],"JSPI_IMPORTS":[],"EXPORTED_RUNTIME_METHODS":{},"INCOMING_MODULE_JS_API":{},"CASE_INSENSITIVE_FS":false,"FILESYSTEM":true,"FORCE_FILESYSTEM":false,"NODERAWFS":false,"NODE_CODE_CACHING":false,"EXPORTED_FUNCTIONS":{},"EXPORT_ALL":false,"EXPORT_KEEPALIVE":true,"RETAIN_COMPILER_SETTINGS":1,"DEFAULT_LIBRARY_FUNCS_TO_INCLUDE":["$ExitStatus","$addOnPostRun","$addOnPreRun","$callRuntimeCallbacks","$getValue","$noExitRuntime","$ptrToString","$setValue","$stackRestore","$stackSave","$warnOnce","$wasmMemory","__cxa_throw","_abort_js","_embind_register_bigint","_embind_register_bool","_embind_register_emval","_embind_register_float","_embind_register_integer","_embind_register_memory_view","_embind_register_std_string","_embind_register_std_wstring","_embind_register_void","emscripten_resize_heap","fd_close","fd_seek","fd_write","$ccall","$cwrap"],"INCLUDE_FULL_LIBRARY":false,"RELOCATABLE":false,"MAIN_MODULE":0,"SIDE_MODULE":0,"RUNTIME_LINKED_LIBS":[],"BUILD_AS_WORKER":false,"PROXY_TO_WORKER":false,"PROXY_TO_WORKER_FILENAME":"","PROXY_TO_PTHREAD":false,"LINKABLE":false,"STRICT":false,"IGNORE_MISSING_MAIN":true,"STRICT_JS":false,"WARN_ON_UNDEFINED_SYMBOLS":0,"ERROR_ON_UNDEFINED_SYMBOLS":0,"SMALL_XHR_CHUNKS":false,"DETERMINISTIC":false,"MODULARIZE":1,"EXPORT_ES6":1,"EXPORT_NAME":"XeniaWasm","DYNAMIC_EXECUTION":1,"BOOTSTRAPPING_STRUCT_INFO":false,"EMSCRIPTEN_TRACING":false,"USE_GLFW":0,"WASM":1,"STANDALONE_WASM":false,"BINARYEN_IGNORE_IMPLICIT_TRAPS":false,"BINARYEN_EXTRA_PASSES":"","WASM_ASYNC_COMPILATION":0,"DYNCALLS":false,"WASM_BIGINT":true,"EMIT_PRODUCERS_SECTION":false,"EMIT_EMSCRIPTEN_LICENSE":false,"LEGALIZE_JS_FFI":0,"USE_SDL":0,"USE_SDL_GFX":0,"USE_SDL_IMAGE":1,"USE_SDL_TTF":1,"USE_SDL_NET":1,"USE_ICU":false,"USE_ZLIB":false,"USE_BZIP2":false,"USE_GIFLIB":false,"USE_LIBJPEG":false,"USE_LIBPNG":false,"USE_REGAL":false,"USE_BOOST_HEADERS":false,"USE_BULLET":false,"USE_VORBIS":false,"USE_OGG":false,"USE_MPG123":false,"USE_FREETYPE":false,"USE_SDL_MIXER":1,"USE_HARFBUZZ":false,"USE_COCOS2D":0,"USE_MODPLUG":false,"SDL2_IMAGE_FORMATS":[],"SDL2_MIXER_FORMATS":["ogg"],"USE_SQLITE3":false,"SHARED_MEMORY":false,"WASM_WORKERS":0,"AUDIO_WORKLET":0,"AUDIO_WORKLET_SUPPORT_AUDIO_PARAMS":true,"WEBAUDIO_DEBUG":0,"PTHREAD_POOL_SIZE":0,"PTHREAD_POOL_SIZE_STRICT":1,"PTHREAD_POOL_DELAY_LOAD":false,"DEFAULT_PTHREAD_STACK_SIZE":0,"PTHREADS_PROFILING":false,"ALLOW_BLOCKING_ON_MAIN_THREAD":true,"PTHREADS_DEBUG":false,"EVAL_CTORS":0,"TEXTDECODER":1,"EMBIND_STD_STRING_IS_UTF8":true,"EMBIND_AOT":false,"OFFSCREENCANVAS_SUPPORT":false,"OFFSCREENCANVASES_TO_PTHREAD":"#canvas","OFFSCREEN_FRAMEBUFFER":false,"FETCH_SUPPORT_INDEXEDDB":true,"FETCH_DEBUG":false,"FETCH":false,"WASMFS":false,"SINGLE_FILE":false,"SINGLE_FILE_BINARY_ENCODE":true,"AUTO_JS_LIBRARIES":true,"AUTO_NATIVE_LIBRARIES":true,"MIN_FIREFOX_VERSION":79,"MIN_SAFARI_VERSION":150000,"MIN_CHROME_VERSION":85,"MIN_NODE_VERSION":2147483647,"MINIMAL_RUNTIME":0,"MINIMAL_RUNTIME_STREAMING_WASM_COMPILATION":false,"MINIMAL_RUNTIME_STREAMING_WASM_INSTANTIATION":false,"SUPPORT_LONGJMP":"emscripten","DISABLE_DEPRECATED_FIND_EVENT_TARGET_BEHAVIOR":true,"HTML5_SUPPORT_DEFERRING_USER_SENSITIVE_REQUESTS":true,"MINIFY_HTML":true,"ASAN_SHADOW_SIZE":-1,"SOURCE_MAP_PREFIXES":[],"DEFAULT_TO_CXX":true,"PRINTF_LONG_DOUBLE":false,"SEPARATE_DWARF_URL":"","ERROR_ON_WASM_CHANGES_AFTER_LINK":false,"ABORT_ON_WASM_EXCEPTIONS":false,"PURE_WASI":false,"IMPORTED_MEMORY":false,"SPLIT_MODULE":false,"AUTOLOAD_DYLIBS":true,"ALLOW_UNIMPLEMENTED_SYSCALLS":true,"TRUSTED_TYPES":false,"POLYFILL":true,"RUNTIME_DEBUG":0,"LEGACY_RUNTIME":false,"SIGNATURE_CONVERSIONS":[],"SOURCE_PHASE_IMPORTS":false,"WASM_ESM_INTEGRATION":false,"JS_BASE64_API":false,"GROWABLE_ARRAYBUFFERS":false,"WASM_JS_TYPES":false,"CROSS_ORIGIN":false,"BINARYEN":1,"TOTAL_STACK":65536,"BINARYEN_ASYNC_COMPILATION":0,"UNALIGNED_MEMORY":0,"FORCE_ALIGNED_MEMORY":0,"PGO":0,"QUANTUM_SIZE":4,"FUNCTION_POINTER_ALIGNMENT":2,"RESERVED_FUNCTION_POINTERS":false,"BUILD_AS_SHARED_LIB":0,"SAFE_SPLIT_MEMORY":0,"SPLIT_MEMORY":0,"BINARYEN_METHOD":"native-wasm","BINARYEN_TRAP_MODE":-1,"PRECISE_I64_MATH":1,"MEMFS_APPEND_TO_TYPED_ARRAYS":1,"ERROR_ON_MISSING_LIBRARIES":1,"EMITTING_JS":1,"SKIP_STACK_IN_SMALL":0,"SAFE_STACK":0,"MEMORY_GROWTH_STEP":-1,"ELIMINATE_DUPLICATE_FUNCTIONS":0,"ELIMINATE_DUPLICATE_FUNCTIONS_DUMP_EQUIVALENT_FUNCTIONS":0,"ELIMINATE_DUPLICATE_FUNCTIONS_PASSES":5,"WASM_OBJECT_FILES":0,"TOTAL_MEMORY":-1,"WASM_MEM_MAX":2147483648,"BINARYEN_MEM_MAX":2147483648,"BINARYEN_PASSES":"","SWAPPABLE_ASM_MODULE":0,"ASM_JS":1,"FINALIZE_ASM_JS":0,"ASYNCIFY_WHITELIST":[],"ASYNCIFY_BLACKLIST":[],"EXCEPTION_CATCHING_WHITELIST":[],"SEPARATE_ASM":0,"SEPARATE_ASM_MODULE_NAME":"","FAST_UNROLLED_MEMCPY_AND_MEMSET":0,"DOUBLE_MODE":0,"PRECISE_F32":0,"ALIASING_FUNCTION_POINTERS":0,"AGGRESSIVE_VARIABLE_ELIMINATION":0,"SIMPLIFY_IFS":1,"DEAD_FUNCTIONS":[],"WASM_BACKEND":-1,"EXPORT_BINDINGS":0,"RUNNING_JS_OPTS":0,"EXPORT_FUNCTION_TABLES":0,"BINARYEN_SCRIPTS":"","WARN_UNALIGNED":0,"ASM_PRIMITIVE_VARS":[],"WORKAROUND_IOS_9_RIGHT_SHIFT_BUG":0,"RUNTIME_FUNCS_TO_IMPORT":[],"LIBRARY_DEPS_TO_AUTOEXPORT":[],"EMIT_EMSCRIPTEN_METADATA":0,"SHELL_FILE":"","LLD_REPORT_UNDEFINED":1,"MEM_INIT_METHOD":0,"USE_PTHREADS":0,"USES_DYNAMIC_ALLOC":1,"REVERSE_DEPS":"auto","RUNTIME_LOGGING":0,"MIN_EDGE_VERSION":2147483647,"MIN_IE_VERSION":2147483647,"WORKAROUND_OLD_WEBGL_UNIFORM_UPLOAD_IGNORED_OFFSET_BUG":0,"AUTO_ARCHIVE_INDEXES":0,"USE_ES6_IMPORT_META":1,"EXTRA_EXPORTED_RUNTIME_METHODS":[],"SUPPORT_ERRNO":0,"DEMANGLE_SUPPORT":0,"MAYBE_WASM2JS":0,"HEADLESS":0,"USE_OFFSET_COVERTER":0,"ASYNCIFY_LAZY_LOAD_CODE":0,"USE_WEBGPU":0,"EMSCRIPTEN_VERSION":"4.0.20-git"} ;
 
 function getCompilerSetting(name) {
   if (!(name in compilerSettings)) return 'invalid compiler setting: ' + name;
@@ -634,9 +631,9 @@ function getCompilerSetting(name) {
 
   
     /**
-   * @param {number} ptr
-   * @param {string} type
-   */
+     * @param {number} ptr
+     * @param {string} type
+     */
   function getValue(ptr, type = 'i8') {
     if (type.endsWith('*')) type = '*';
     switch (type) {
@@ -663,10 +660,10 @@ function getCompilerSetting(name) {
 
   
     /**
-   * @param {number} ptr
-   * @param {number} value
-   * @param {string} type
-   */
+     * @param {number} ptr
+     * @param {number} value
+     * @param {string} type
+     */
   function setValue(ptr, value, type = 'i8') {
     if (type.endsWith('*')) type = '*';
     switch (type) {
@@ -1156,15 +1153,15 @@ function getCompilerSetting(name) {
   
   
     /**
-   * Given a pointer 'idx' to a null-terminated UTF8-encoded string in the given
-   * array that contains uint8 values, returns a copy of that string as a
-   * Javascript String object.
-   * heapOrArray is either a regular array, or a JavaScript typed array view.
-   * @param {number=} idx
-   * @param {number=} maxBytesToRead
-   * @param {boolean=} ignoreNul - If true, the function will not stop on a NUL character.
-   * @return {string}
-   */
+     * Given a pointer 'idx' to a null-terminated UTF8-encoded string in the given
+     * array that contains uint8 values, returns a copy of that string as a
+     * Javascript String object.
+     * heapOrArray is either a regular array, or a JavaScript typed array view.
+     * @param {number=} idx
+     * @param {number=} maxBytesToRead
+     * @param {boolean=} ignoreNul - If true, the function will not stop on a NUL character.
+     * @return {string}
+     */
   var UTF8ArrayToString = (heapOrArray, idx = 0, maxBytesToRead, ignoreNul) => {
   
       var endPtr = findStringEnd(heapOrArray, idx, maxBytesToRead, ignoreNul);
@@ -1202,18 +1199,18 @@ function getCompilerSetting(name) {
     };
   
     /**
-   * Given a pointer 'ptr' to a null-terminated UTF8-encoded string in the
-   * emscripten HEAP, returns a copy of that string as a Javascript String object.
-   *
-   * @param {number} ptr
-   * @param {number=} maxBytesToRead - An optional length that specifies the
-   *   maximum number of bytes to read. You can omit this parameter to scan the
-   *   string until the first 0 byte. If maxBytesToRead is passed, and the string
-   *   at [ptr, ptr+maxBytesToReadr[ contains a null byte in the middle, then the
-   *   string will cut short at that byte index.
-   * @param {boolean=} ignoreNul - If true, the function will not stop on a NUL character.
-   * @return {string}
-   */
+     * Given a pointer 'ptr' to a null-terminated UTF8-encoded string in the
+     * emscripten HEAP, returns a copy of that string as a Javascript String object.
+     *
+     * @param {number} ptr
+     * @param {number=} maxBytesToRead - An optional length that specifies the
+     *   maximum number of bytes to read. You can omit this parameter to scan the
+     *   string until the first 0 byte. If maxBytesToRead is passed, and the string
+     *   at [ptr, ptr+maxBytesToReadr[ contains a null byte in the middle, then the
+     *   string will cut short at that byte index.
+     * @param {boolean=} ignoreNul - If true, the function will not stop on a NUL character.
+     * @return {string}
+     */
   var UTF8ToString = (ptr, maxBytesToRead, ignoreNul) => {
       assert(typeof ptr == 'number', `UTF8ToString expects a number (got ${typeof ptr})`);
       return ptr ? UTF8ArrayToString(HEAPU8, ptr, maxBytesToRead, ignoreNul) : '';
@@ -1624,11 +1621,11 @@ function getCompilerSetting(name) {
   
   
     /**
-   * @param {string|null=} returnType
-   * @param {Array=} argTypes
-   * @param {Array=} args
-   * @param {Object=} opts
-   */
+     * @param {string|null=} returnType
+     * @param {Array=} argTypes
+     * @param {Array=} args
+     * @param {Object=} opts
+     */
   var ccall = (ident, returnType, argTypes, args, opts) => {
       // For fast lookup of conversion functions
       var toC = {
@@ -1681,10 +1678,10 @@ function getCompilerSetting(name) {
 
   
     /**
-   * @param {string=} returnType
-   * @param {Array=} argTypes
-   * @param {Object=} opts
-   */
+     * @param {string=} returnType
+     * @param {Array=} argTypes
+     * @param {Object=} opts
+     */
   var cwrap = (ident, returnType, argTypes, opts) => {
       return (...args) => ccall(ident, returnType, argTypes, args, opts);
     };
@@ -1918,7 +1915,6 @@ Module['FS_createPreloadedFile'] = FS.createPreloadedFile;
   'usesDestructorStack',
   'createJsInvokerSignature',
   'checkArgCount',
-  'getEnumValueType',
   'getRequiredArgCount',
   'createJsInvoker',
   'UnboundTypeError',
@@ -1934,7 +1930,6 @@ Module['FS_createPreloadedFile'] = FS.createPreloadedFile;
   'getInheritedInstanceCount',
   'getLiveInheritedInstances',
   'enumReadValueFromPointer',
-  'installIndexedIterator',
   'runDestructors',
   'craftInvokerFunction',
   'embind__requireFunction',
@@ -1979,8 +1974,6 @@ missingLibrarySymbols.forEach(missingLibrarySymbol)
   'wasmExports',
   'HEAPF32',
   'HEAPF64',
-  'HEAP8',
-  'HEAPU8',
   'HEAP16',
   'HEAPU16',
   'HEAP32',
@@ -2082,6 +2075,7 @@ missingLibrarySymbols.forEach(missingLibrarySymbol)
   'FS_ignorePermissions',
   'FS_filesystems',
   'FS_syncFSRequests',
+  'FS_readFiles',
   'FS_lookupPath',
   'FS_getPath',
   'FS_hashName',
@@ -2239,8 +2233,6 @@ unexportedSymbols.forEach(unexportedRuntimeSymbol);
 
 function checkIncomingModuleAPI() {
   ignoredModuleProp('fetchSettings');
-  ignoredModuleProp('logReadFiles');
-  ignoredModuleProp('loadSplitModule');
 }
 
 // Imports from the Wasm binary.
@@ -2459,7 +2451,7 @@ run();
 // and return either the Module itself, or a promise of the module.
 //
 // We assign to the `moduleRtn` global here and configure closure to see
-// this as an extern so it won't get minified.
+// this as and extern so it won't get minified.
 
 if (runtimeInitialized)  {
   moduleRtn = Module;

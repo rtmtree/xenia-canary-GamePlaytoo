@@ -92,7 +92,7 @@ EMCC_FLAGS=(
     -s WASM=1
     -s ALLOW_MEMORY_GROWTH=1
     -s EXPORTED_FUNCTIONS="[_malloc,_free,_initialize_emulator,_load_rom,_start_emulation,_stop_emulation,_get_frame_buffer,_read_byte_from_memory,_write_byte_to_memory,_write_bytes_to_memory,_init_rom_loading,_load_rom_chunk_direct,_finalize_rom_loading,_load_rom_from_base64,_test_read_function]"
-    -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap']"
+    -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap', 'HEAPU8', 'HEAP8']"
     -s MODULARIZE=1
     -s EXPORT_NAME="'XeniaWasm'"
     -s INVOKE_RUN=0
@@ -128,6 +128,11 @@ echo -e "${BLUE}Copying files to web directory...${NC}"
 
 cp xenia_wasm.js "$OUTPUT_DIR/"
 cp xenia_wasm.wasm "$OUTPUT_DIR/" 2>/dev/null || echo -e "${YELLOW}Warning: .wasm file not generated${NC}"
+
+# Also copy to the src directory where the react app imports it
+mkdir -p "$WEB_DIR/src/wasm"
+cp xenia_wasm.js "$WEB_DIR/src/wasm/"
+cp xenia_wasm.wasm "$WEB_DIR/src/wasm/" 2>/dev/null || true
 
 # Create a loader script for the WebAssembly module
 cat > "$OUTPUT_DIR/loader.js" << 'EOF'

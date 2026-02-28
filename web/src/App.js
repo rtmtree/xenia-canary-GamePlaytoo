@@ -73,6 +73,7 @@ function App() {
   const [wasmTest, setWasmTest] = useState('Not tested');
   const canvasRef = useRef(null);
   const hasAutoLoadedRom = useRef(false);
+  const animationFrameRef = useRef(null);
 
   useEffect(() => {
     const initializeWasm = async () => {
@@ -122,46 +123,46 @@ function App() {
     try {
       console.log('🔄 Auto-loading development ROM from http://localhost:8008/risk.bin');
       setStatus('Loading development ROM...');
-      
+
       const response = await fetch('http://localhost:8008/risk.bin');
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
+
       const contentLength = response.headers.get('Content-Length');
       const total = contentLength ? parseInt(contentLength, 10) : 0;
       let loaded = 0;
-      
+
       const reader = response.body.getReader();
       const chunks = [];
-      
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        
+
         chunks.push(value);
         loaded += value.length;
-        
+
         if (total > 0) {
           const progress = (loaded / total * 100).toFixed(1);
           setStatus(`Loading ROM: ${progress}%`);
           console.log(`📊 ROM loading progress: ${progress}% (${loaded}/${total} bytes)`);
         }
       }
-      
+
       // Combine all chunks into a single ArrayBuffer
       const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
       const romBuffer = new Uint8Array(totalLength);
       let position = 0;
-      
+
       for (const chunk of chunks) {
         romBuffer.set(chunk, position);
         position += chunk.length;
       }
-      
+
       console.log(`✅ Development ROM loaded successfully: ${romBuffer.length} bytes`);
       handleRomLoad(romBuffer.buffer);
-      
+
     } catch (error) {
       console.error('❌ Failed to load development ROM:', error);
       setError(`Failed to auto-load ROM: ${error.message}`);
@@ -215,7 +216,7 @@ function App() {
 
       // Start render loop
       startRenderLoop();
-      
+
       console.log('🎮 Game started successfully');
     } catch (err) {
       setError(`Failed to start game: ${err.message}`);
@@ -238,8 +239,8 @@ function App() {
       setIsPaused(true);
       isPausedRef.current = true;
       setStatus('Game paused');
-      if (window.animationId) {
-        cancelAnimationFrame(window.animationId);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
       }
     }
   };
@@ -257,8 +258,8 @@ function App() {
       setFps(0);
       setMemory(0);
 
-      if (window.animationId) {
-        cancelAnimationFrame(window.animationId);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
       }
 
       // Clear canvas
@@ -277,57 +278,42 @@ function App() {
     let lastFrameTime = 0;
     let frameCount = 0;
 
-    const renderFrame = (currentTime) => {
+    const renderFrame = async (currentTime) => {
       if (!isPlayingRef.current || isPausedRef.current) return;
 
-      // Calculate FPS
-      if (lastFrameTime) {
-        const deltaTime = currentTime - lastFrameTime;
-        frameCount++;
-
-        if (frameCount % 30 === 0) {
-          const currentFps = Math.round(1000 / deltaTime);
-          setFps(currentFps);
-        }
-      }
-      lastFrameTime = currentTime;
-
-      // Get frame buffer from WebAssembly and render to canvas
       const canvas = canvasRef.current;
-      if (canvas && wasmLoader) {
-        const ctx = canvas.getContext('2d');
-        const frameBuffer = wasmLoader.getFrameBuffer();
+      const ctx = canvas.getContext('2d');
 
-        if (frameBuffer) {
-          try {
-            // Use the new frame buffer reading method
-            const frameBufferData = wasmLoader.getFrameBufferData(canvas.width, canvas.height);
-            
-            // Create ImageData from the frame buffer data
-            const imageData = new ImageData(
-              new Uint8ClampedArray(frameBufferData),
-              canvas.width,
-              canvas.height
-            );
-            ctx.putImageData(imageData, 0, 0);
-            
-          } catch (error) {
-            console.error('❌ Failed to read frame buffer:', error);
-            // Don't return here, continue the loop so it can retry next frame
-          }
+      // Get frame buffer pointer
+      const frameBuffer = wasmLoader.getFrameBuffer();
+
+      if (frameBuffer) {
+        try {
+          // Use the new async frame buffer reading method
+          const frameBufferData = await wasmLoader.getFrameBufferData(canvas.width, canvas.height);
+
+          // Create ImageData from the frame buffer data
+          const imageData = new ImageData(
+            new Uint8ClampedArray(frameBufferData),
+            canvas.width,
+            canvas.height
+          );
+          ctx.putImageData(imageData, 0, 0);
+
+        } catch (error) {
+          console.error('❌ Failed to read frame buffer:', error);
+          // Don't return here, continue the loop so it can retry next frame
         }
       }
 
-      // Update memory usage (simulated)
-      if (frameCount % 60 === 0) {
-        const memoryUsage = Math.round(Math.random() * 512 + 256);
-        setMemory(memoryUsage);
+      // Continue render loop
+      if (isPlayingRef.current && !isPausedRef.current) {
+        animationFrameRef.current = requestAnimationFrame(renderFrame);
       }
-
-      window.animationId = requestAnimationFrame(renderFrame);
     };
 
-    window.animationId = requestAnimationFrame(renderFrame);
+    // Start the render loop
+    renderFrame();
   };
 
   const handleFullscreen = () => {

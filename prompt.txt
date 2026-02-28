@@ -5,10 +5,10 @@ and make the web project run it (React I guess)
 
 
 
-run "npm start" at `web` (also press Y if port is not available)
-check if the wasm works at "http://localhost:PORT/" by looking at console if there is error
-if not, fix the C code.
-then rebuild with " ./build_wasm.sh"
+run "npm run build" at `web` and start http server at build folder
+check if the wasm works at "http://localhost:PORT/" by looking at console if there is error (make sure the rom is loaded)
+if not, fix the C/js code.
+if the C code is fixed, rebuild with " ./build_wasm.sh"
 and keep doing this until the "http://localhost:PORT/" log no error (wasm works)
 
 

@@ -20,9 +20,13 @@
 #include "xenia/gpu/webgpu/webgpu_graphics_system.h"
 #include "xenia/ui/windowed_app_context.h"
 
+#include <algorithm>
+
 namespace xe {
 namespace gpu {
 namespace webgpu {
+
+static uint8_t g_webgpu_frame_buffer[1280 * 720 * 4];
 
 WebGPUCommandProcessor::WebGPUCommandProcessor(
     GraphicsSystem* graphics_system, kernel::KernelState* kernel_state)
@@ -67,6 +71,33 @@ void WebGPUCommandProcessor::Shutdown() {
 void WebGPUCommandProcessor::ClearCaches() {
   // Clear WebGPU-specific caches
   CommandProcessor::ClearCaches();
+}
+
+void WebGPUCommandProcessor::IssueSwap(uint32_t frontbuffer_ptr,
+                                       uint32_t frontbuffer_width,
+                                       uint32_t frontbuffer_height) {
+  uint32_t* src_ptr = reinterpret_cast<uint32_t*>(memory_->TranslatePhysical(frontbuffer_ptr));
+  if (!src_ptr) return;
+
+  uint32_t w = std::min(frontbuffer_width, 1280u);
+  uint32_t h = std::min(frontbuffer_height, 720u);
+
+  for (uint32_t y = 0; y < h; y++) {
+    for (uint32_t x = 0; x < w; x++) {
+      // Decode big-endian ARGB
+      uint32_t pixel = xe::byte_swap(src_ptr[y * frontbuffer_width + x]);
+      uint32_t a = (pixel >> 24) & 0xFF;
+      uint32_t r = (pixel >> 16) & 0xFF;
+      uint32_t g = (pixel >> 8) & 0xFF;
+      uint32_t b = (pixel >> 0) & 0xFF;
+
+      uint32_t dest_idx = (y * 1280 + x) * 4;
+      g_webgpu_frame_buffer[dest_idx + 0] = r;
+      g_webgpu_frame_buffer[dest_idx + 1] = g;
+      g_webgpu_frame_buffer[dest_idx + 2] = b;
+      g_webgpu_frame_buffer[dest_idx + 3] = a;
+    }
+  }
 }
 
 void WebGPUCommandProcessor::InitializeWebGPU() {
@@ -274,22 +305,8 @@ void WebGPUCommandProcessor::RenderFrame() {
 extern "C" {
   EMSCRIPTEN_KEEPALIVE
   void* webgpu_get_frame_buffer() {
-    // Return pointer to frame buffer data
-    static uint8_t frame_buffer[1280 * 720 * 4]; // RGBA
-    
-    // Generate animated test pattern
-    for (int y = 0; y < 720; y++) {
-      for (int x = 0; x < 1280; x++) {
-        int idx = (y * 1280 + x) * 4;
-        uint32_t pixel = (x + y + frame_counter_) * 7;
-        frame_buffer[idx] = pixel % 255;     // R
-        frame_buffer[idx + 1] = (pixel * 2) % 255; // G
-        frame_buffer[idx + 2] = (pixel * 3) % 255; // B
-        frame_buffer[idx + 3] = 255;           // A
-      }
-    }
-    
-    return frame_buffer;
+    // Return pointer to the actual swapped frame buffer data
+    return xe::gpu::webgpu::g_webgpu_frame_buffer;
   }
   
   EMSCRIPTEN_KEEPALIVE
