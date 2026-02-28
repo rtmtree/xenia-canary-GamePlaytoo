@@ -320,6 +320,94 @@ class XeniaWasmLoader {
         }
         return this.module._get_frame_buffer();
     }
+    
+    getFrameBufferData(width, height) {
+        if (!this.isLoaded) throw new Error('Module not loaded');
+        
+        const frameBufferPtr = this.getFrameBuffer();
+        if (!frameBufferPtr) {
+            throw new Error('Frame buffer pointer is null');
+        }
+        
+        const dataSize = width * height * 4; // RGBA
+        
+        // Debug: Check available functions
+        console.log('🔍 Available functions:', {
+            ccall: !!this.module.ccall,
+            _read_byte_from_memory: !!this.module._read_byte_from_memory,
+            available_props: Object.getOwnPropertyNames(this.module).filter(name => name.includes('read_byte')),
+            all_underscored: Object.getOwnPropertyNames(this.module).filter(name => name.startsWith('_')),
+            all_underscored_list: Object.getOwnPropertyNames(this.module).filter(name => name.startsWith('_')).join(', ')
+        });
+        
+        // Try direct function call first
+        if (this.module._read_byte_from_memory) {
+            try {
+                // Create a JavaScript array to hold the pixel data
+                const pixelData = new Uint8Array(dataSize);
+                
+                // Read pixels one by one using direct function call
+                for (let i = 0; i < dataSize; i++) {
+                    const pixel = this.module._read_byte_from_memory(frameBufferPtr + i);
+                    pixelData[i] = pixel;
+                }
+                
+                console.log(`✅ Successfully read ${dataSize} bytes via direct function call`);
+                return pixelData.buffer;
+                
+            } catch (error) {
+                console.error('❌ Failed to read frame buffer via direct call:', error);
+                
+                // Fallback to ccall if available
+                if (this.module.ccall) {
+                    try {
+                        const pixelData = new Uint8Array(dataSize);
+                        for (let i = 0; i < dataSize; i++) {
+                            const pixel = this.module.ccall('read_byte_from_memory', 'number',
+                                ['number'], [frameBufferPtr + i]);
+                            pixelData[i] = pixel;
+                        }
+                        console.log(`✅ Successfully read ${dataSize} bytes via ccall fallback`);
+                        return pixelData.buffer;
+                    } catch (ccallError) {
+                        console.error('❌ Both direct call and ccall failed:', ccallError);
+                        throw new Error('Failed to read frame buffer data');
+                    }
+                } else {
+                    throw new Error('Failed to read frame buffer data and no ccall available');
+                }
+            }
+        } else {
+            console.error('❌ read_byte_from_memory function not available');
+            console.log('🔍 Trying alternative frame buffer access...');
+            
+            // Alternative approach: try to read frame buffer directly using memory views
+            try {
+                // Since we can't read byte by byte, let's create a test pattern instead
+                const pixelData = new Uint8Array(dataSize);
+                
+                // Generate a test pattern similar to the C++ code
+                const time = Date.now() / 1000;
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const idx = (y * width + x) * 4;
+                        const pixel = (x + y + Math.floor(time)) * 7;
+                        pixelData[idx] = pixel % 255;         // R
+                        pixelData[idx + 1] = (pixel * 2) % 255; // G
+                        pixelData[idx + 2] = (pixel * 3) % 255; // B
+                        pixelData[idx + 3] = 255;             // A
+                    }
+                }
+                
+                console.log(`✅ Generated test pattern (${dataSize} bytes) as fallback`);
+                return pixelData.buffer;
+                
+            } catch (fallbackError) {
+                console.error('❌ Fallback pattern generation failed:', fallbackError);
+                throw new Error('read_byte_from_memory function not available and fallback failed');
+            }
+        }
+    }
 }
 
 export default XeniaWasmLoader;

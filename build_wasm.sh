@@ -37,7 +37,6 @@ echo -e "${GREEN}Emscripten found: $(emcc --version | head -n1)${NC}"
 
 # Create build directory
 echo -e "${BLUE}Creating build directory...${NC}"
-rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 mkdir -p "$OUTPUT_DIR"
 
@@ -73,74 +72,14 @@ if [ ${#VALID_SOURCES[@]} -eq 0 ]; then
     exit 1
 fi
 
-# Create a minimal main file for WebAssembly
-cat > "$BUILD_DIR/main_wasm.cpp" << 'EOF'
-// Main entry point for Xenia WebAssembly build
-#include <emscripten.h>
-#include <iostream>
-#include <vector>
-
-extern "C" {
-    // Initialize the emulator
-    EMSCRIPTEN_KEEPALIVE
-    int initialize_emulator() {
-        std::cout << "Initializing Xenia WebAssembly emulator..." << std::endl;
-        // TODO: Initialize actual Xenia components
-        return 0;
-    }
-    
-    // Load a ROM file
-    EMSCRIPTEN_KEEPALIVE
-    int load_rom(const uint8_t* data, size_t size) {
-        std::cout << "Loading ROM of size: " << size << " bytes" << std::endl;
-        // TODO: Implement ROM loading
-        return 0;
-    }
-    
-    // Start the emulation
-    EMSCRIPTEN_KEEPALIVE
-    int start_emulation() {
-        std::cout << "Starting emulation..." << std::endl;
-        // TODO: Start actual emulation
-        return 0;
-    }
-    
-    // Stop the emulation
-    EMSCRIPTEN_KEEPALIVE
-    int stop_emulation() {
-        std::cout << "Stopping emulation..." << std::endl;
-        // TODO: Stop actual emulation
-        return 0;
-    }
-    
-    // Render frame to canvas
-    EMSCRIPTEN_KEEPALIVE
-    void render_frame() {
-        // TODO: Render actual frame
-        // This will be called from JavaScript animation loop
-    }
-    
-    // Get frame buffer pointer
-    EMSCRIPTEN_KEEPALIVE
-    uint8_t* get_frame_buffer() {
-        static std::vector<uint8_t> frame_buffer(1280 * 720 * 4); // RGBA
-        // Fill with test pattern
-        for (int i = 0; i < 1280 * 720; i++) {
-            int idx = i * 4;
-            frame_buffer[idx] = (i * 7) % 255;     // R
-            frame_buffer[idx + 1] = (i * 13) % 255; // G
-            frame_buffer[idx + 2] = (i * 17) % 255; // B
-            frame_buffer[idx + 3] = 255;           // A
-        }
-        return frame_buffer.data();
-    }
-}
-
-int main() {
-    std::cout << "Xenia WebAssembly module loaded" << std::endl;
-    return 0;
-}
-EOF
+# Copy the existing main_wasm.cpp instead of generating a new one
+echo -e "${BLUE}Using existing main_wasm.cpp file...${NC}"
+if [ -f "$BUILD_DIR/main_wasm.cpp" ]; then
+    echo -e "${GREEN}Found existing main_wasm.cpp${NC}"
+else
+    echo -e "${RED}Error: main_wasm.cpp not found in build directory${NC}"
+    exit 1
+fi
 
 # Compile with Emscripten
 echo -e "${BLUE}Compiling with Emscripten...${NC}"
@@ -148,11 +87,11 @@ echo -e "${BLUE}Compiling with Emscripten...${NC}"
 cd "$BUILD_DIR"
 
 EMCC_FLAGS=(
-    -O3
+    -O0  # Disable optimization to prevent function removal
     --bind
     -s WASM=1
     -s ALLOW_MEMORY_GROWTH=1
-    -s EXPORTED_FUNCTIONS="[_malloc,_free,_initialize_emulator,_load_rom,_start_emulation,_stop_emulation,_render_frame,_get_frame_buffer]"
+    -s EXPORTED_FUNCTIONS="[_malloc,_free,_initialize_emulator,_load_rom,_start_emulation,_stop_emulation,_get_frame_buffer,_read_byte_from_memory,_write_byte_to_memory,_write_bytes_to_memory,_init_rom_loading,_load_rom_chunk_direct,_finalize_rom_loading,_load_rom_from_base64,_test_read_function]"
     -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap']"
     -s MODULARIZE=1
     -s EXPORT_NAME="'XeniaWasm'"
@@ -164,6 +103,8 @@ EMCC_FLAGS=(
     -s WASM_ASYNC_COMPILATION=0
     -s SINGLE_FILE=0
     -s EXPORT_ES6=1
+    -s NO_FORCE_FILESYSTEM=1
+    -s RETAIN_COMPILER_SETTINGS=1
     -I"$PROJECT_ROOT/src"
     -I"$PROJECT_ROOT/third_party"
     --std=c++17

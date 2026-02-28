@@ -120,10 +120,10 @@ function App() {
 
   const loadDevelopmentRom = async () => {
     try {
-      console.log('🔄 Auto-loading development ROM from http://localhost:8000/risk.bin');
+      console.log('🔄 Auto-loading development ROM from http://localhost:8008/risk.bin');
       setStatus('Loading development ROM...');
       
-      const response = await fetch('http://localhost:8000/risk.bin');
+      const response = await fetch('http://localhost:8008/risk.bin');
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
@@ -299,41 +299,22 @@ function App() {
         const frameBuffer = wasmLoader.getFrameBuffer();
 
         if (frameBuffer) {
-          // Use the same memory access pattern as XeniaWasmLoader
-          let wasmMemoryBuffer = null;
-          
-          // Try different memory access methods in order of preference
-          if (wasmLoader.module.HEAPU8 && wasmLoader.module.HEAPU8.buffer) {
-            wasmMemoryBuffer = wasmLoader.module.HEAPU8.buffer;
-            console.log('🔍 Using HEAPU8.buffer for frame buffer access');
-          } else if (wasmLoader.module.HEAP8 && wasmLoader.module.HEAP8.buffer) {
-            wasmMemoryBuffer = wasmLoader.module.HEAP8.buffer;
-            console.log('🔍 Using HEAP8.buffer for frame buffer access');
-          } else if (wasmLoader.module.memory && wasmLoader.module.memory.buffer) {
-            wasmMemoryBuffer = wasmLoader.module.memory.buffer;
-            console.log('🔍 Using memory.buffer for frame buffer access');
-          } else if (wasmLoader.module.buffer) {
-            wasmMemoryBuffer = wasmLoader.module.buffer;
-            console.log('🔍 Using module.buffer for frame buffer access');
+          try {
+            // Use the new frame buffer reading method
+            const frameBufferData = wasmLoader.getFrameBufferData(canvas.width, canvas.height);
+            
+            // Create ImageData from the frame buffer data
+            const imageData = new ImageData(
+              new Uint8ClampedArray(frameBufferData),
+              canvas.width,
+              canvas.height
+            );
+            ctx.putImageData(imageData, 0, 0);
+            
+          } catch (error) {
+            console.error('❌ Failed to read frame buffer:', error);
+            // Don't return here, continue the loop so it can retry next frame
           }
-
-          if (!wasmMemoryBuffer) {
-            console.error("❌ No compatible memory interface found to read frame buffer!");
-            console.log("🔍 Available module properties:", Object.getOwnPropertyNames(wasmLoader.module));
-            return;
-          }
-
-          // Create ImageData from frame buffer memory
-          const imageData = new ImageData(
-            new Uint8ClampedArray(
-              wasmMemoryBuffer,
-              frameBuffer,
-              canvas.width * canvas.height * 4
-            ),
-            canvas.width,
-            canvas.height
-          );
-          ctx.putImageData(imageData, 0, 0);
         }
       }
 
