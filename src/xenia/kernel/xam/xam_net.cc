@@ -28,6 +28,8 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <sys/socket.h>
+#include <sys/select.h>
+#include <sys/time.h>
 #endif
 
 namespace xe {

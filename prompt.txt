@@ -46,3 +46,15 @@ VM6:63 🔍 ROM loading completed successfully
 
 but the canvas is still blank.
 make it render the game like what it does with Vulkan on other build
+
+
+the web build of xenia project that wasm built from build_wasm.sh log this
+
+ERROR
+[object ErrorEvent]
+    at handleError (http://localhost:3007/static/js/bundle.js:36131:58)
+    at http://localhost:3007/static/js/bundle.js:36150:7
+ERROR
+Uncaught TypeError: Failed to execute 'importScripts' on 'WorkerGlobalScope': Module scripts don't support importScripts().
+    at handleError (http://localhost:3007/static/js/bundle.js:36131:58)
+    at http://localhost:3007/static/js/bundle.js:36150:7

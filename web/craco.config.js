@@ -38,6 +38,13 @@ module.exports = {
         }
       });
 
+
+      // Ignore Webpack's default behavior for Emscripten's importScripts which fails in typical module mode
+      webpackConfig.output.globalObject = 'this';
+
+      // Bypass Webpack parsing for Emscripten generated file to avoid Web Worker rewriting
+      webpackConfig.module.noParse = /xenia_wasm\.js|xenia_wasm\.worker\.js/;
+
       return webpackConfig;
     },
   },

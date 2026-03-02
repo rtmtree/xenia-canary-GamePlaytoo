@@ -389,6 +389,8 @@ bool MMIOHandler::TryDecodeLoadStore(const uint8_t* p,
 
   return true;
 
+#elif XE_ARCH_WASM32
+  return false;
 #else
 #error TryDecodeLoadStore not implemented for the target CPU architecture.
   return false;
@@ -516,6 +518,8 @@ bool MMIOHandler::ExceptionCallback(Exception* ex) {
       assert_true(value_reg == DecodedLoadStore::kArm64ValueRegZero);
       // Register write is ignored for X31.
     }
+#elif XE_ARCH_WASM32
+    // Not implemented for WASM32
 #else
 #error Register value writing not implemented for the target CPU architecture.
 #endif  // XE_ARCH
@@ -540,6 +544,8 @@ bool MMIOHandler::ExceptionCallback(Exception* ex) {
         assert_true(value_reg == DecodedLoadStore::kArm64ValueRegZero);
         value = 0;
       }
+#elif XE_ARCH_WASM32
+      value = 0;
 #else
 #error Register value reading not implemented for the target CPU architecture.
 #endif  // XE_ARCH

@@ -242,7 +242,7 @@ typedef uint32_t MicroProfileThreadIdType;
 #define MP_GETCURRENTPROCESSID() GetCurrentProcessId()
 typedef uint32_t MicroProfileProcessIdType;
 
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__EMSCRIPTEN__)
 #include <unistd.h>
 #include <time.h>
 inline int64_t MicroProfileTicksPerSecondCpu()

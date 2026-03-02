@@ -34,7 +34,9 @@
 #include "xenia/cpu/xex_module.h"
 
 // TODO(benvanik): based on compiler support
+#if XE_ARCH_AMD64
 #include "xenia/cpu/backend/x64/x64_backend.h"
+#endif
 
 #if 0 && DEBUG
 #define DEFAULT_DEBUG_FLAG true
@@ -678,6 +680,8 @@ bool Processor::OnThreadBreakpointHit(Exception* ex) {
   ex->set_resume_pc(thread_info->host_context.rip + 2);
 #elif XE_ARCH_ARM64
   ex->set_resume_pc(thread_info->host_context.pc + 2);
+#elif XE_ARCH_WASM32
+  ex->set_resume_pc(0);
 #else
 #error Instruction pointer not specified for the target CPU architecture.
 #endif  // XE_ARCH

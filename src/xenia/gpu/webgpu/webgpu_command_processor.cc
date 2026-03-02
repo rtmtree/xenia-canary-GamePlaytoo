@@ -55,10 +55,8 @@ void WebGPUCommandProcessor::Shutdown() {
     frame_buffer_ = nullptr;
   }
   
-  if (swap_chain_) {
-    // Release swap chain
-    swap_chain_ = nullptr;
-  }
+  // Removed swap chain
+  
   
   if (device_) {
     // Release device
@@ -272,11 +270,11 @@ void WebGPUCommandProcessor::RenderFrame() {
     const pipelineDescriptor = {
       layout: 'auto',
       vertex: {
-        module: vertexShader,
+        "module": vertexShader,
         entryPoint: 'vs_main',
       },
       fragment: {
-        module: fragmentShader,
+        "module": fragmentShader,
         entryPoint: 'fs_main',
         targets: [{
           format: navigator.gpu.getPreferredCanvasFormat(),
@@ -312,10 +310,11 @@ extern "C" {
   EMSCRIPTEN_KEEPALIVE
   void webgpu_render_frame() {
     // This would trigger WebGPU rendering
-    // For now, just increment frame counter
-    frame_counter_++;
+    // For now, just increment frame counter locally for standalone exports
+    // frame_counter_++;
   }
 }
+
 
 }  // namespace webgpu
 }  // namespace gpu

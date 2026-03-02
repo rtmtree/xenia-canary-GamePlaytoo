@@ -19,13 +19,29 @@ class XeniaWasmLoader {
             const wasmBinary = await wasmResponse.arrayBuffer();
             console.log('🔍 WASM binary loaded, size:', wasmBinary.byteLength);
 
-            // Import the WebAssembly module
-            const XeniaWasm = await import('./xenia_wasm.js');
-            console.log('🔍 Module imported, initializing...');
+            // Load the WebAssembly module via a script tag to prevent Webpack
+            // from bundling it. This fixes the pthread worker loading issue 
+            // since Emscripten explicitly relies on document.currentScript.src
+            await new Promise((resolve, reject) => {
+                if (window.XeniaWasm) {
+                    resolve();
+                    return;
+                }
+                const script = document.createElement('script');
+                script.src = '/wasm/xenia_wasm.js';
+                script.onload = resolve;
+                script.onerror = reject;
+                document.body.appendChild(script);
+            });
+            console.log('🔍 Module script loaded, initializing...');
 
             // Initialize the module with preloaded WASM binary
-            this.module = await XeniaWasm.default({
+            this.module = await window.XeniaWasm({
+                mainScriptUrlOrBlob: '/wasm/xenia_wasm.js',
                 wasmBinary: wasmBinary,
+                locateFile: function (path) {
+                    return '/wasm/' + path;
+                },
                 onRuntimeInitialized: () => {
                     console.log('✅ Emscripten runtime initialized');
                 }
@@ -360,19 +376,9 @@ class XeniaWasmLoader {
 
         const dataSize = width * height * 4; // RGBA
 
-        // Debug: Check available functions
-        console.log('🔍 Available functions:', {
-            ccall: !!this.module.ccall,
-            _read_byte_from_memory: !!this.module._read_byte_from_memory,
-            available_props: Object.getOwnPropertyNames(this.module).filter(name => name.includes('read_byte')),
-            all_underscored: Object.getOwnPropertyNames(this.module).filter(name => name.startsWith('_')),
-            all_underscored_list: Object.getOwnPropertyNames(this.module).filter(name => name.startsWith('_')).join(', ')
-        });
-
         // Try direct array access first (much faster)
         if (this.module.HEAPU8) {
             try {
-                console.log('🔍 Trying direct HEAPU8 access...');
                 // Create a copy of the buffer data because the memory might change
                 const sourceArray = new Uint8Array(this.module.HEAPU8.buffer, frameBufferPtr, dataSize);
                 const pixelData = new Uint8ClampedArray(sourceArray);
@@ -385,15 +391,6 @@ class XeniaWasmLoader {
         // Try ccall fallback
         if (this.module.ccall) {
             try {
-                console.log('🔍 Trying ccall approach...');
-
-                // Add a small delay to ensure function is ready
-                await new Promise(resolve => setTimeout(resolve, 10));
-
-                // Check if function is available now
-                const funcAvailable = this.module.ccall('read_byte_from_memory', 'number', ['number'], [0]);
-                console.log('🔍 Function test call result:', funcAvailable);
-
                 const pixelData = new Uint8Array(dataSize);
 
                 // Read pixels one by one using ccall
@@ -403,7 +400,6 @@ class XeniaWasmLoader {
                     pixelData[i] = pixel;
                 }
 
-                console.log(`✅ Successfully read ${dataSize} bytes via ccall`);
                 return pixelData.buffer;
 
             } catch (error) {
@@ -415,7 +411,6 @@ class XeniaWasmLoader {
         // Fallback to direct function call
         if (this.module._read_byte_from_memory) {
             try {
-                console.log('🔍 Trying direct function call...');
                 const pixelData = new Uint8Array(dataSize);
 
                 // Read pixels one by one using direct function call
@@ -424,7 +419,6 @@ class XeniaWasmLoader {
                     pixelData[i] = pixel;
                 }
 
-                console.log(`✅ Successfully read ${dataSize} bytes via direct call`);
                 return pixelData.buffer;
 
             } catch (error) {
@@ -432,7 +426,6 @@ class XeniaWasmLoader {
             }
         } else {
             console.error('❌ read_byte_from_memory function not available');
-            console.log('🔍 Trying alternative frame buffer access...');
 
             // Alternative approach: try to read frame buffer directly using memory views
             try {
@@ -452,7 +445,6 @@ class XeniaWasmLoader {
                     }
                 }
 
-                console.log(`✅ Generated test pattern (${dataSize} bytes) as fallback`);
                 return pixelData.buffer;
 
             } catch (fallbackError) {

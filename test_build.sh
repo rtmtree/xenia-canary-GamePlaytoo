@@ -43,31 +43,24 @@ mkdir -p "$OUTPUT_DIR"
 # Find Xenia source files
 echo -e "${BLUE}Locating Xenia source files...${NC}"
 
+# Find Xenia source files dynamically (ignoring Windows/Android/Mac specific implementations)
 XENIA_SOURCES=($(find "$PROJECT_ROOT/src/xenia" -type f -name "*.cc" \
     ! -path "*/win32/*" ! -path "*/android/*" ! -path "*/mac/*" \
-    ! -path "*/d3d12/*" ! -path "*/vulkan/*" ! -path "*/gpu/null/*" ! -path "*/x64/*" ! -path "*/tools/*" ! -path "*/testing/*" ! -path "*/apu/*" ! -path "*/hid/winkey/*" ! -path "*/hid/skylander/*" ! -path "*/hid/sdl/*" ! -path "*/hid/xinput/*" ! -path "*/helper/sdl/*" \
-    ! -name "*_win.cc" ! -name "*_android.cc" ! -name "*demo.cc" ! -name "*_amd64.cc" \
+    ! -path "*/d3d12/*" ! -path "*/vulkan/*" ! -path "*/tools/*" \
+    ! -name "*_win.cc" ! -name "*_android.cc" \
     ! -name "*_mac.cc" ! -name "*_ios.cc" ! -name "*_xaudio2.cc" \
     ! -name "*_xinput.cc" ! -name "*_winkey.cc" ! -name "*_gnulinux.cc" \
     ! -name "*_gtk.cc" ! -name "*renderdoc*.cc" ! -name "*_posix.cc" \
-    ! -name "spirv*.cc" ! -name "trace_*.cc" ! -name "texture_dump.cc" \
-    ! -name "shader_compiler_main.cc" ! -name "*test*.cc"))
+    ! -name "spirv*.cc"))
 
 # Check if source files exist
-VALID_SOURCES=()
+VALID_SOURCES=("$PROJECT_ROOT/src/xenia/gpu/webgpu/webgpu_graphics_system.cc")
+# )
 for source in "${XENIA_SOURCES[@]}"; do
     if [ -f "$source" ]; then
         VALID_SOURCES+=("$source")
     fi
 done
-
-VALID_SOURCES+=("$PROJECT_ROOT/third_party/fmt/src/format.cc")
-VALID_SOURCES+=("$PROJECT_ROOT/third_party/fmt/src/os.cc")
-VALID_SOURCES+=("$PROJECT_ROOT/src/xenia/base/clock_posix.cc")
-VALID_SOURCES+=("$PROJECT_ROOT/src/xenia/base/threading_posix.cc")
-VALID_SOURCES+=("$PROJECT_ROOT/src/xenia/base/memory_posix.cc")
-VALID_SOURCES+=("$PROJECT_ROOT/src/xenia/base/filesystem_posix.cc")
-VALID_SOURCES+=("$PROJECT_ROOT/src/xenia/base/mapped_memory_posix.cc")
 
 if [ ${#VALID_SOURCES[@]} -eq 0 ]; then
     echo -e "${RED}Error: No valid source files found. Please check the paths.${NC}"
@@ -96,17 +89,14 @@ EMCC_FLAGS=(
     -s ENVIRONMENT="web"
     -s WASM_ASYNC_COMPILATION=0
     -s SINGLE_FILE=0
+    -s EXPORT_ES6=1
     -s NO_FORCE_FILESYSTEM=1
     -s RETAIN_COMPILER_SETTINGS=1
     --use-port=emdawnwebgpu
-    -pthread
-    -s PTHREAD_POOL_SIZE=4
     -I"$PROJECT_ROOT"
     -I"$PROJECT_ROOT/src"
     -I"$PROJECT_ROOT/third_party"
-    -I"$PROJECT_ROOT/third_party/fmt/include"
     -I"$PROJECT_ROOT/third_party/glslang"
-    -I"$PROJECT_ROOT/third_party/llvm/include"
     -D__EMSCRIPTEN__
     -DXE_PLATFORM_LINUX=1
     -DXE_PLATFORM_LINUX_WEB=1
@@ -138,8 +128,6 @@ cp xenia_wasm.wasm "$OUTPUT_DIR/" 2>/dev/null || echo -e "${YELLOW}Warning: .was
 mkdir -p "$WEB_DIR/src/wasm"
 cp xenia_wasm.js "$WEB_DIR/src/wasm/"
 cp xenia_wasm.wasm "$WEB_DIR/src/wasm/" 2>/dev/null || true
-cp xenia_wasm.worker.js "$OUTPUT_DIR/" 2>/dev/null || echo -e "${YELLOW}Warning: .worker.js file not generated${NC}"
-cp xenia_wasm.worker.js "$WEB_DIR/src/wasm/" 2>/dev/null || true
 
 # Create a loader script for the WebAssembly module
 cat > "$OUTPUT_DIR/loader.js" << 'EOF'
@@ -154,28 +142,9 @@ class XeniaWasmLoader {
         if (this.isLoaded) return;
         
         try {
-            // Load the WebAssembly module via a script tag to prevent Webpack
-            // from bundling it. This fixes the pthread worker loading issue 
-            // since Emscripten explicitly relies on document.currentScript.src
-            await new Promise((resolve, reject) => {
-                if (window.XeniaWasm) {
-                    resolve();
-                    return;
-                }
-                const script = document.createElement('script');
-                script.src = '/wasm/xenia_wasm.js';
-                script.onload = resolve;
-                script.onerror = reject;
-                document.body.appendChild(script);
-            });
-            console.log('🔍 Module script loaded, initializing...');
-
-            this.module = await window.XeniaWasm({
-                mainScriptUrlOrBlob: '/wasm/xenia_wasm.js',
-                locateFile: function (path) {
-                    return '/wasm/' + path;
-                }
-            });
+            // Import the WebAssembly module
+            const XeniaWasm = await import('./xenia_wasm.js');
+            this.module = await XeniaWasm.default();
             this.isLoaded = true;
             console.log('Xenia WebAssembly module loaded successfully');
             return true;

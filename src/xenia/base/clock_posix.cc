@@ -12,6 +12,11 @@
 #include "xenia/base/assert.h"
 #include "xenia/base/clock.h"
 
+#if defined(__EMSCRIPTEN__)
+#undef CLOCK_MONOTONIC_RAW
+#define CLOCK_MONOTONIC_RAW CLOCK_MONOTONIC
+#endif
+
 namespace xe {
 
 uint64_t Clock::host_tick_frequency_platform() {

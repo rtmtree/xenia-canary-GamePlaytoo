@@ -869,6 +869,7 @@ void Value::Permute(Value* src1, Value* src2, TypeName type) {
       perm.u8[i * 2] = v * 2;
       perm.u8[i * 2 + 1] = v * 2 + 1;
     }
+#if XE_ARCH_AMD64
     auto lod = [](const vec128_t& v) {
       return _mm_loadu_si128((const __m128i*)&v);
     };
@@ -895,6 +896,9 @@ void Value::Permute(Value* src1, Value* src2, TypeName type) {
     }
 
     sto(constant.v128, _mm_blendv_epi8(xmm1, xmm2, lod(unp_mask)));
+#else
+    assert_always(); // Not implemented for non-AMD64
+#endif
 
   } else {
     assert_unhandled_case(type);

@@ -925,7 +925,7 @@ bool SimplificationPass::CheckSHRByConst(hir::Instr* i,
       Value* lz_input = var_def->src1.value;
       TypeName type_of_lz_input = lz_input->type;
       size_t shift_for_zero =
-          xe::log2_floor(GetTypeSize(type_of_lz_input) * CHAR_BIT);
+          xe::log2_floor(static_cast<uint32_t>(GetTypeSize(type_of_lz_input) * CHAR_BIT));
 
       if (shift == shift_for_zero) {
         // we ought to be OPCODE_IS_FALSE!

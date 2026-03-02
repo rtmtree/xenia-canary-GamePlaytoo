@@ -101,6 +101,7 @@ static void XeCopy16384Movdir64M(CacheLine* XE_RESTRICT to,
 using VastCpyDispatch = void (*)(CacheLine* XE_RESTRICT physaddr,
                                  CacheLine* XE_RESTRICT rdmapping,
                                  uint32_t written_length);
+#if XE_ARCH_AMD64
 static void vastcpy_impl_avx(CacheLine* XE_RESTRICT physaddr,
                              CacheLine* XE_RESTRICT rdmapping,
                              uint32_t written_length) {
@@ -140,7 +141,9 @@ static void vastcpy_impl_avx(CacheLine* XE_RESTRICT physaddr,
     xe::swcache::WriteLineNT(physaddr + i, &line0);
   }
 }
+#endif
 
+#if XE_ARCH_AMD64
 static void vastcpy_impl_movdir64m(CacheLine* XE_RESTRICT physaddr,
                                    CacheLine* XE_RESTRICT rdmapping,
                                    uint32_t written_length) {
@@ -171,6 +174,7 @@ static void vastcpy_impl_movdir64m(CacheLine* XE_RESTRICT physaddr,
     _movdir64b(physaddr + i, rdmapping + i);
   }
 }
+#endif
 static void vastcpy_impl_repmovs(CacheLine* XE_RESTRICT physaddr,
                                  CacheLine* XE_RESTRICT rdmapping,
                                  uint32_t written_length) {
@@ -194,6 +198,7 @@ static void first_vastcpy(CacheLine* XE_RESTRICT physaddr,
                           CacheLine* XE_RESTRICT rdmapping,
                           uint32_t written_length) {
   VastCpyDispatch dispatch_to_use = nullptr;
+#if XE_ARCH_AMD64
   if (amd64::GetFeatureFlags() & amd64::kX64EmitMovdir64M) {
     XELOGI("Selecting MOVDIR64M vastcpy.");
     dispatch_to_use = vastcpy_impl_movdir64m;
@@ -204,6 +209,9 @@ static void first_vastcpy(CacheLine* XE_RESTRICT physaddr,
     XELOGI("Selecting generic AVX vastcpy.");
     dispatch_to_use = vastcpy_impl_avx;
   }
+#else
+  dispatch_to_use = vastcpy_impl_repmovs;
+#endif
 
   vastcpy_dispatch =
       dispatch_to_use;  // all future calls will go through our selected path

@@ -21,11 +21,6 @@ WebGPUGraphicsSystem::WebGPUGraphicsSystem() {}
 WebGPUGraphicsSystem::~WebGPUGraphicsSystem() {}
 
 std::string WebGPUGraphicsSystem::name() const {
-  auto webgpu_command_processor =
-      static_cast<WebGPUCommandProcessor*>(command_processor());
-  if (webgpu_command_processor != nullptr) {
-    return webgpu_command_processor->GetWindowTitleText();
-  }
   return "WebGPU";
 }
 

@@ -90,13 +90,13 @@ class XSocket : public XObject {
   };
 
   enum Protocol {
-    IPPROTO_TCP = 6,
-    IPPROTO_UDP = 17,
+    kIpProtoTcp = 6,
+    kIpProtoUdp = 17,
 
     // LIVE Voice and Data Protocol
     // https://blog.csdn.net/baozi3026/article/details/4277227
     // Format: [cbGameData][GameData(encrypted)][VoiceData(unencrypted)]
-    IPPROTO_VDP = 254,
+    kIpProtoVdp = 254,
   };
 
   XSocket(KernelState* kernel_state);

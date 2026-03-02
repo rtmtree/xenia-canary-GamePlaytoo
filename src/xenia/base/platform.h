@@ -37,6 +37,9 @@
 #elif defined(__gnu_linux__)
 #define XE_PLATFORM_GNU_LINUX 1
 #define XE_PLATFORM_LINUX 1
+#elif defined(__EMSCRIPTEN__)
+#define XE_PLATFORM_WEB 1
+#define XE_PLATFORM_LINUX 1
 #else
 #error Unsupported target OS.
 #endif
@@ -168,8 +171,10 @@
 #define XE_HOST_CACHE_LINE_SIZE 64
 #elif XE_ARCH_ARM64 == 1
 #define XE_HOST_CACHE_LINE_SIZE 64
+#elif defined(__wasm__) || defined(__wasm32__)
+#define XE_ARCH_WASM32 1
+#define XE_HOST_CACHE_LINE_SIZE 64
 #else
-
 #error unknown cache line size for unknown architecture!
 #endif
 

@@ -1,4 +1,4 @@
-// Minimal WebAssembly module for Xenia browser integration
+// WebAssembly module entry point for Xenia browser integration
 #include <emscripten.h>
 #include <iostream>
 #include <vector>
@@ -41,7 +41,7 @@ extern "C" {
                 rom_data.resize(offset + chunk_size);
             }
             
-            // Copy chunk data directly (no base64 decoding needed)
+            // Copy chunk data directly
             std::copy(chunk_data, chunk_data + chunk_size, rom_data.begin() + offset);
             
             return 0;
@@ -74,6 +74,20 @@ extern "C" {
         }
     }
     
+    EMSCRIPTEN_KEEPALIVE
+    uint8_t read_byte_from_memory(uint8_t* address) {
+        try {
+            return *address;
+        } catch (...) {
+            return 0;
+        }
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    int test_read_function() {
+        return 0;
+    }
+
     // Finalize ROM loading
     EMSCRIPTEN_KEEPALIVE
     int finalize_rom_loading() {
@@ -100,12 +114,9 @@ extern "C" {
             std::string base64_str(base64_data);
             rom_data.clear();
             rom_data.reserve(base64_str.length());
-            
-            // Simple base64 decode (placeholder)
             for (char c : base64_str) {
                 rom_data.push_back(static_cast<uint8_t>(c));
             }
-            
             return 0;
         } catch (...) {
             return -1;
@@ -115,14 +126,12 @@ extern "C" {
     // Start the emulation
     EMSCRIPTEN_KEEPALIVE
     int start_emulation() {
-        // Simulate starting emulation
         return 0;
     }
     
     // Stop the emulation
     EMSCRIPTEN_KEEPALIVE
     int stop_emulation() {
-        // Simulate stopping emulation
         return 0;
     }
     
@@ -131,22 +140,17 @@ extern "C" {
     uint8_t* get_frame_buffer() {
         static std::vector<uint8_t> frame_buffer(1280 * 720 * 4); // RGBA
         static uint32_t frame_counter = 0;
-        
-        // Generate animated test pattern
         frame_counter++;
         for (int y = 0; y < 720; y++) {
             for (int x = 0; x < 1280; x++) {
                 int idx = (y * 1280 + x) * 4;
                 uint32_t pixel = (x + y + frame_counter) * 7;
-                frame_buffer[idx] = pixel % 255;     // R
-                frame_buffer[idx + 1] = (pixel * 2) % 255; // G
-                frame_buffer[idx + 2] = (pixel * 3) % 255; // B
-                frame_buffer[idx + 3] = 255;           // A
+                frame_buffer[idx] = pixel % 255;
+                frame_buffer[idx + 1] = (pixel * 2) % 255;
+                frame_buffer[idx + 2] = (pixel * 3) % 255;
+                frame_buffer[idx + 3] = 255;
             }
         }
-        
         return frame_buffer.data();
     }
 }
-
-// No main function needed for modular build

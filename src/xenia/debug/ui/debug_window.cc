@@ -859,6 +859,7 @@ void DebugWindow::DrawRegistersPane() {
       state_.register_group = RegisterGroup::kGuestVector;
     }
   }
+#if XE_ARCH_AMD64
   ImGui::SameLine();
   if (state_.register_group == RegisterGroup::kHostGeneral) {
     ImGui::PushStyleColor(ImGuiCol_Button,
@@ -881,6 +882,8 @@ void DebugWindow::DrawRegistersPane() {
       state_.register_group = RegisterGroup::kHostVector;
     }
   }
+#endif
+
 
   ImGui::Checkbox("Hex", &state_.register_input_hex);
 
@@ -968,6 +971,7 @@ void DebugWindow::DrawRegistersPane() {
       }
       ImGui::EndChild();
     } break;
+#if XE_ARCH_AMD64
     case RegisterGroup::kHostGeneral: {
       ImGui::BeginChild("##host_general");
       for (int i = 0; i < 18; ++i) {
@@ -1008,7 +1012,8 @@ void DebugWindow::DrawRegistersPane() {
         ImGui::EndGroup();
       }
       ImGui::EndChild();
-    }
+    } break;
+#endif
   }
 
   if (dirty_guest_context) {

@@ -132,7 +132,11 @@ void EnableAffinityConfiguration() {}
 // uint64_t ticks() { return mach_absolute_time(); }
 
 uint32_t current_thread_system_id() {
+#if defined(__EMSCRIPTEN__)
+  return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(pthread_self()));
+#else
   return static_cast<uint32_t>(syscall(SYS_gettid));
+#endif
 }
 
 void MaybeYield() {
@@ -583,7 +587,9 @@ class PosixCondition<Thread> final : public PosixConditionBase {
     WaitStarted();
     std::unique_lock<std::mutex> lock(state_mutex_);
     if (state_ != State::kUninitialized && state_ != State::kFinished) {
+#if !defined(__EMSCRIPTEN__)
       pthread_setname_np(thread_, std::string(name).c_str());
+#endif
 #if XE_PLATFORM_ANDROID
       SetAndroidPreApi26Name(name);
 #endif
@@ -685,6 +691,10 @@ class PosixCondition<Thread> final : public PosixConditionBase {
 #if XE_PLATFORM_ANDROID
     sigqueue(pthread_gettid_np(thread_),
              GetSystemSignal(SignalType::kThreadUserCallback), value);
+#elif defined(__EMSCRIPTEN__)
+    // Emscripten doesn't support pthread_sigqueue.
+    // In theory we should find another way to trigger the callback asynchronously,
+    // but for now we just don't support it or rely on polling instead.
 #else
     pthread_sigqueue(thread_, GetSystemSignal(SignalType::kThreadUserCallback),
                      value);
@@ -1176,7 +1186,9 @@ void Thread::Exit(int exit_code) {
 }
 
 void set_name(const std::string_view name) {
+#if !defined(__EMSCRIPTEN__)
   pthread_setname_np(pthread_self(), std::string(name).c_str());
+#endif
 #if XE_PLATFORM_ANDROID
   if (!android_pthread_getname_np_ && current_thread_) {
     current_thread_->condition().SetAndroidPreApi26Name(name);

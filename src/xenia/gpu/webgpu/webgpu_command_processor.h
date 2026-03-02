@@ -51,7 +51,7 @@ class WebGPUCommandProcessor : public CommandProcessor {
                         kernel::KernelState* kernel_state);
   ~WebGPUCommandProcessor() override;
 
-  std::string GetWindowTitleText() const override { return "WebGPU"; }
+  // Removed GetWindowTitleText as it doesn't exist in base class
 
   bool Initialize() override;
   void Shutdown() override;
@@ -60,6 +60,14 @@ class WebGPUCommandProcessor : public CommandProcessor {
   void IssueSwap(uint32_t frontbuffer_ptr, uint32_t frontbuffer_width,
                  uint32_t frontbuffer_height) override;
 
+  void TracePlaybackWroteMemory(uint32_t base_ptr, uint32_t length) override {}
+  void RestoreEdramSnapshot(const void* snapshot) override {}
+
+ protected:
+  bool SetupContext() override { return true; }
+  void ShutdownContext() override {}
+
+ public:
   // WebGPU-specific methods
   WGPUDevice GetDevice() const { return device_; }
   WGPUQueue GetQueue() const { return queue_; }
@@ -73,8 +81,7 @@ class WebGPUCommandProcessor : public CommandProcessor {
   WGPUDevice device_ = nullptr;
   WGPUQueue queue_ = nullptr;
   WGPUSurface surface_ = nullptr;
-  WGPUSwapChain swap_chain_ = nullptr;
-  
+  // Removed WGPUSwapChain as it's not supported in newer Dawn
   // Frame buffer
   WGPUTexture frame_texture_ = nullptr;
   WGPUBuffer frame_buffer_ = nullptr;

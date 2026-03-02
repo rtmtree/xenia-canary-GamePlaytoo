@@ -12,7 +12,14 @@
 
 #include <memory>
 
+#ifndef __EMSCRIPTEN__
 #include "third_party/renderdoc/renderdoc_app.h"
+#else
+struct RENDERDOC_API_1_0_0 {
+    int dummy;
+};
+#endif
+
 #include "xenia/base/platform.h"
 
 #if XE_PLATFORM_WIN32
