@@ -330,9 +330,11 @@ X_STATUS Emulator::Setup(
       XELOGE("{}: Failed to setup audio_system!", __func__);
       return result;
     }
+#if !defined(__EMSCRIPTEN__)
     audio_media_player_ = std::make_unique<apu::AudioMediaPlayer>(
         audio_system_.get(), kernel_state_.get());
     audio_media_player_->Setup();
+#endif
   }
 
   // Initialize emulator fallback exception handling last.

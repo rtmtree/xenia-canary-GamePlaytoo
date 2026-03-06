@@ -9,9 +9,28 @@ class XeniaWasmLoader {
         if (this.isLoaded) return;
         
         try {
-            // Import the WebAssembly module
-            const XeniaWasm = await import('./xenia_wasm.js');
-            this.module = await XeniaWasm.default();
+            // Load the WebAssembly module via a script tag to prevent Webpack
+            // from bundling it. This fixes the pthread worker loading issue 
+            // since Emscripten explicitly relies on document.currentScript.src
+            await new Promise((resolve, reject) => {
+                if (window.XeniaWasm) {
+                    resolve();
+                    return;
+                }
+                const script = document.createElement('script');
+                script.src = '/wasm/xenia_wasm.js';
+                script.onload = resolve;
+                script.onerror = reject;
+                document.body.appendChild(script);
+            });
+            console.log('🔍 Module script loaded, initializing...');
+
+            this.module = await window.XeniaWasm({
+                mainScriptUrlOrBlob: '/wasm/xenia_wasm.js',
+                locateFile: function (path) {
+                    return '/wasm/' + path;
+                }
+            });
             this.isLoaded = true;
             console.log('Xenia WebAssembly module loaded successfully');
             return true;

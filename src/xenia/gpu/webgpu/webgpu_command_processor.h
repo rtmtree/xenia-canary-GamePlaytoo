@@ -42,9 +42,7 @@ namespace webgpu {
 
 class WebGPUCommandProcessor : public CommandProcessor {
  protected:
-#define OVERRIDING_BASE_CMDPROCESSOR
-#include "../pm4_command_processor_declare.h"
-#undef OVERRIDING_BASE_CMDPROCESSOR
+  // We do not override PM4 methods yet, using base CommandProcessor implementations
 
  public:
   WebGPUCommandProcessor(GraphicsSystem* graphics_system,

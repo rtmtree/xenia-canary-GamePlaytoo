@@ -45,12 +45,13 @@ echo -e "${BLUE}Locating Xenia source files...${NC}"
 
 XENIA_SOURCES=($(find "$PROJECT_ROOT/src/xenia" -type f -name "*.cc" \
     ! -path "*/win32/*" ! -path "*/android/*" ! -path "*/mac/*" \
-    ! -path "*/d3d12/*" ! -path "*/vulkan/*" ! -path "*/gpu/null/*" ! -path "*/x64/*" ! -path "*/tools/*" ! -path "*/testing/*" ! -path "*/apu/*" ! -path "*/hid/winkey/*" ! -path "*/hid/skylander/*" ! -path "*/hid/sdl/*" ! -path "*/hid/xinput/*" ! -path "*/helper/sdl/*" \
+    ! -path "*/d3d12/*" ! -path "*/vulkan/*" ! -path "*/gpu/null/*" ! -path "*/x64/*" ! -path "*/tools/*" ! -path "*/testing/*" ! -path "*/apu/xaudio2/*" ! -path "*/apu/alsa/*" ! -path "*/apu/sdl/*" ! -path "*/hid/winkey/*" ! -path "*/hid/skylander/*" ! -path "*/hid/sdl/*" ! -path "*/hid/xinput/*" ! -path "*/helper/sdl/*" \
     ! -name "*_win.cc" ! -name "*_android.cc" ! -name "*demo.cc" ! -name "*_amd64.cc" \
     ! -name "*_mac.cc" ! -name "*_ios.cc" ! -name "*_xaudio2.cc" \
     ! -name "*_xinput.cc" ! -name "*_winkey.cc" ! -name "*_gnulinux.cc" \
     ! -name "*_gtk.cc" ! -name "*renderdoc*.cc" ! -name "*_posix.cc" \
     ! -name "spirv*.cc" ! -name "trace_*.cc" ! -name "texture_dump.cc" \
+    ! -name "xma_context_new.cc" ! -name "xma_context_old.cc" ! -name "xma_context_master.cc" \
     ! -name "shader_compiler_main.cc" ! -name "*test*.cc"))
 
 # Check if source files exist
@@ -66,14 +67,15 @@ VALID_SOURCES+=("$PROJECT_ROOT/third_party/fmt/src/os.cc")
 VALID_SOURCES+=("$PROJECT_ROOT/src/xenia/base/clock_posix.cc")
 VALID_SOURCES+=("$PROJECT_ROOT/src/xenia/base/threading_posix.cc")
 VALID_SOURCES+=("$PROJECT_ROOT/src/xenia/base/memory_posix.cc")
-VALID_SOURCES+=("$PROJECT_ROOT/src/xenia/base/filesystem_posix.cc")
-VALID_SOURCES+=("$PROJECT_ROOT/src/xenia/base/mapped_memory_posix.cc")
+# Use ONLY our minimal main_wasm.cpp file to avoid Xenia's complex memory system
+VALID_SOURCES=()
+VALID_SOURCES=("$BUILD_DIR/main_wasm.cpp")
 
 if [ ${#VALID_SOURCES[@]} -eq 0 ]; then
-    echo -e "${RED}Error: No valid source files found. Please check the paths.${NC}"
+    echo -e "${RED}Error: main_wasm.cpp not found. Please check the paths.${NC}"
     exit 1
 fi
-echo -e "${GREEN}Found ${#VALID_SOURCES[@]} source files${NC}"
+echo -e "${GREEN}Using minimal build with ${#VALID_SOURCES[@]} source file${NC}"
 
 # Compile with Emscripten
 echo -e "${BLUE}Compiling with Emscripten...${NC}"

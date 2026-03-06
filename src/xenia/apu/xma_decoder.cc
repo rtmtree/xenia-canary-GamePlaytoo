@@ -11,9 +11,11 @@
 
 #include "xenia/apu/xma_context.h"
 #include "xenia/apu/xma_context_fake.h"
+#if !defined(__EMSCRIPTEN__)
 #include "xenia/apu/xma_context_master.h"
 #include "xenia/apu/xma_context_new.h"
 #include "xenia/apu/xma_context_old.h"
+#endif
 
 #include "xenia/base/cvar.h"
 #include "xenia/base/logging.h"
@@ -25,9 +27,11 @@
 #include "xenia/cpu/thread_state.h"
 #include "xenia/kernel/kernel_state.h"
 #include "xenia/kernel/xthread.h"
+#if !defined(__EMSCRIPTEN__)
 extern "C" {
 #include "third_party/FFmpeg/libavutil/log.h"
 }  // extern "C"
+#endif
 
 // As with normal Microsoft, there are like twelve different ways to access
 // the audio APIs. Early games use XMA*() methods almost exclusively to touch
@@ -81,6 +85,7 @@ XmaDecoder::XmaDecoder(cpu::Processor* processor)
 
 XmaDecoder::~XmaDecoder() = default;
 
+#if !defined(__EMSCRIPTEN__)
 void av_log_callback(void* avcl, int level, const char* fmt, va_list va) {
   if (!cvars::ffmpeg_verbose && level > AV_LOG_WARNING) {
     return;
@@ -126,10 +131,13 @@ void av_log_callback(void* avcl, int level, const char* fmt, va_list va) {
   xe::logging::AppendLogLineFormat(LogSrc::Apu, log_level, level_char,
                                    "ffmpeg: {}", buff.to_string_view());
 }
+#endif
 
 X_STATUS XmaDecoder::Setup(kernel::KernelState* kernel_state) {
   // Setup ffmpeg logging callback
+#if !defined(__EMSCRIPTEN__)
   av_log_set_callback(av_log_callback);
+#endif
 
   // Let the processor know we want register access callbacks.
   memory_->AddVirtualMappedRange(
@@ -150,6 +158,9 @@ X_STATUS XmaDecoder::Setup(kernel::KernelState* kernel_state) {
 
   // Setup XMA contexts.
   for (int i = 0; i < kContextCount; ++i) {
+#if defined(__EMSCRIPTEN__)
+    contexts_[i] = new XmaContextFake();
+#else
     if (cvars::xma_decoder == "fake") {
       contexts_[i] = new XmaContextFake();
     } else if (cvars::xma_decoder == "master") {
@@ -161,6 +172,7 @@ X_STATUS XmaDecoder::Setup(kernel::KernelState* kernel_state) {
     } else {
       contexts_[i] = new XmaContextNew();
     }
+#endif
 
     uint32_t guest_ptr = context_data_first_ptr_ + i * sizeof(XMA_CONTEXT_DATA);
     if (contexts_[i]->Setup(i, memory(), guest_ptr)) {

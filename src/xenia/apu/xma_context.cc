@@ -23,7 +23,9 @@ extern "C" {
 #pragma warning(push)
 #pragma warning(disable : 4101 4244 5033)
 #endif
+#if !defined(__EMSCRIPTEN__)
 #include "third_party/FFmpeg/libavcodec/avcodec.h"
+#endif
 #if XE_COMPILER_MSVC
 #pragma warning(pop)
 #endif
@@ -42,6 +44,7 @@ XmaContext::XmaContext()
 XmaContext::~XmaContext() {}
 
 void XmaContext::DumpRaw(AVFrame* frame, int id) {
+#if !defined(__EMSCRIPTEN__)
   FILE* outfile =
       xe::filesystem::OpenFile(fmt::format("out{}.raw", id).c_str(), "ab");
   if (!outfile) {
@@ -54,6 +57,7 @@ void XmaContext::DumpRaw(AVFrame* frame, int id) {
     }
   }
   fclose(outfile);
+#endif
 }
 
 void XmaContext::ConvertFrame(const uint8_t** samples, bool is_two_channel,

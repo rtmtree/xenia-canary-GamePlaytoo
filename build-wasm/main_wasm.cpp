@@ -1,13 +1,13 @@
 // Minimal WebAssembly module for Xenia browser integration
 #include <emscripten.h>
-#include <iostream>
 #include <vector>
-#include <cstdlib>
-#include <string>
+#include <cstdint>
+#include <cstring>
 
-// Global ROM storage
+// Global state
 static std::vector<uint8_t> rom_data;
 static bool rom_loading_initialized = false;
+static std::vector<uint8_t> g_memory_pool;
 
 extern "C" {
     // Initialize the emulator
@@ -79,6 +79,31 @@ extern "C" {
     int finalize_rom_loading() {
         rom_loading_initialized = false;
         return 0;
+    }
+    
+    // Simple memory allocation that doesn't trigger complex initialization
+    EMSCRIPTEN_KEEPALIVE
+    uint8_t* allocate_memory(size_t size) {
+        if (g_memory_pool.size() < size) {
+            g_memory_pool.resize(size);
+        }
+        return g_memory_pool.data();
+    }
+    
+    // Read a single byte from memory (for frame buffer access)
+    EMSCRIPTEN_KEEPALIVE
+    uint8_t read_byte_from_memory(uint8_t* address) {
+        if (!address) return 0;
+        return *address;
+    }
+    
+    // Test function to ensure read_byte_from_memory is not optimized away
+    EMSCRIPTEN_KEEPALIVE
+    void test_read_function() {
+        // This function exists to ensure read_byte_from_memory is used
+        static uint8_t test_data[] = {1, 2, 3, 4};
+        volatile uint8_t result = read_byte_from_memory(test_data);
+        (void)result; // Suppress unused variable warning
     }
     
     // Load a ROM file (direct method)

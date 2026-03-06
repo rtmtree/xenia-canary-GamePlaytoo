@@ -18,9 +18,11 @@ extern "C" {
 #pragma warning(push)
 #pragma warning(disable : 4101 4244 5033)
 #endif
+#if !defined(__EMSCRIPTEN__)
 #include "third_party/FFmpeg/libavcodec/avcodec.h"
 #include "third_party/FFmpeg/libavformat/avformat.h"
 #include "third_party/FFmpeg/libavformat/avio.h"
+#endif
 #if XE_COMPILER_MSVC
 #pragma warning(pop)
 #endif
@@ -32,6 +34,8 @@ DEFINE_int32(xmp_default_volume, 70,
 
 namespace xe {
 namespace apu {
+
+#if !defined(__EMSCRIPTEN__)
 
 int32_t InitializeAndOpenAvCodec(std::vector<uint8_t>* song_data,
                                  AVFormatContext*& format_context,
@@ -554,6 +558,37 @@ void AudioMediaPlayer::DeleteDriver() {
     driver_.reset();
   }
 }
+
+#else
+
+AudioMediaPlayer::AudioMediaPlayer(apu::AudioSystem* audio_system,
+                                   kernel::KernelState* kernel_state)
+    : audio_system_(audio_system),
+      kernel_state_(kernel_state),
+      active_playlist_(nullptr),
+      active_song_(nullptr) {};
+AudioMediaPlayer::~AudioMediaPlayer() {}
+void AudioMediaPlayer::WorkerThreadMain() {}
+void AudioMediaPlayer::Setup() {}
+X_STATUS AudioMediaPlayer::Play(uint32_t playlist_handle, uint32_t song_handle, bool force) { return X_STATUS_UNSUCCESSFUL; }
+void AudioMediaPlayer::Play() {}
+void AudioMediaPlayer::Pause() {}
+void AudioMediaPlayer::Stop(bool change_state, bool force) {}
+void AudioMediaPlayer::Continue() {}
+X_STATUS AudioMediaPlayer::Next() { return X_STATUS_UNSUCCESSFUL; }
+X_STATUS AudioMediaPlayer::Previous() { return X_STATUS_UNSUCCESSFUL; }
+bool AudioMediaPlayer::LoadSongToMemory(std::vector<uint8_t>* buffer) { return false; }
+void AudioMediaPlayer::AddPlaylist(uint32_t handle, std::unique_ptr<XmpApp::Playlist> playlist) {}
+void AudioMediaPlayer::RemovePlaylist(uint32_t handle) {}
+X_STATUS AudioMediaPlayer::SetVolume(float volume) { return X_STATUS_UNSUCCESSFUL; }
+bool AudioMediaPlayer::IsLastSongInPlaylist() const { return false; }
+void AudioMediaPlayer::SetCaptureCallback(uint32_t callback, uint32_t context, bool title_render) {}
+void AudioMediaPlayer::OnStateChanged() {}
+void AudioMediaPlayer::ProcessAudioBuffer(std::vector<float>* buffer) {}
+bool AudioMediaPlayer::SetupDriver(uint32_t sample_rate, uint32_t channels) { return false; }
+void AudioMediaPlayer::DeleteDriver() {}
+
+#endif
 
 }  // namespace apu
 }  // namespace xe

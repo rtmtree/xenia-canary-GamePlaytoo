@@ -4,16 +4,67 @@
 #include <vector>
 #include <cstdlib>
 #include <string>
+#include <fstream>
+#include <filesystem>
+
+#include "xenia/emulator.h"
+#include "xenia/apu/nop/nop_audio_system.h"
+#include "xenia/gpu/webgpu/webgpu_graphics_system.h"
+#include "xenia/hid/nop/nop_hid.h"
+#include "xenia/base/threading.h"
+#include "xenia/base/profiling.h"
+#include "xenia/base/logging.h"
+#include "xenia/config.h"
 
 // Global ROM storage
 static std::vector<uint8_t> rom_data;
 static bool rom_loading_initialized = false;
+static std::unique_ptr<xe::Emulator> global_emulator;
 
 extern "C" {
     // Initialize the emulator
     EMSCRIPTEN_KEEPALIVE
     int initialize_emulator() {
-        // Simple initialization
+        if (global_emulator) return 0;
+        xe::Profiler::Initialize();
+
+        std::filesystem::path storage_root = "/xenia";
+        std::error_code ec;
+        std::filesystem::create_directories(storage_root, ec);
+        config::SetupConfig(storage_root);
+
+        std::filesystem::path content_root = storage_root / "content";
+        std::filesystem::path cache_root = storage_root / "cache";
+
+        global_emulator = std::make_unique<xe::Emulator>("", storage_root, content_root, cache_root);
+
+        // Setup the emulator using our headless/NOP factories
+        auto audio_system_factory = [](xe::cpu::Processor* processor) {
+            return std::make_unique<xe::apu::nop::NopAudioSystem>(processor);
+        };
+        auto graphics_system_factory = []() {
+            return std::make_unique<xe::gpu::webgpu::WebGPUGraphicsSystem>();
+        };
+        auto input_driver_factory = [](xe::ui::Window* window) -> std::vector<std::unique_ptr<xe::hid::InputDriver>> {
+            std::vector<std::unique_ptr<xe::hid::InputDriver>> drivers;
+            drivers.push_back(xe::hid::nop::Create(window, 0));
+            return drivers;
+        };
+
+        xe::X_STATUS result = global_emulator->Setup(
+            nullptr,  // no window
+            nullptr,  // no imgui wrapper
+            true,     // require CPU backend
+            audio_system_factory,
+            graphics_system_factory,
+            input_driver_factory
+        );
+
+        if (XFAILED(result)) {
+            global_emulator.reset();
+            return -1;
+        }
+
         return 0;
     }
     
@@ -126,31 +177,36 @@ extern "C" {
     // Start the emulation
     EMSCRIPTEN_KEEPALIVE
     int start_emulation() {
+        if (!global_emulator) return -1;
+        if (rom_data.empty()) return -1;
+
+        std::string rom_path = "/xenia/rom.bin";
+        std::ofstream out(rom_path, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(rom_data.data()), rom_data.size());
+        out.close();
+
+        xe::X_STATUS result = global_emulator->LaunchPath(rom_path);
+        if (XFAILED(result)) {
+            return -1;
+        }
         return 0;
     }
     
     // Stop the emulation
     EMSCRIPTEN_KEEPALIVE
     int stop_emulation() {
+        if (global_emulator) {
+            global_emulator->TerminateTitle();
+        }
         return 0;
     }
     
     // Get frame buffer pointer
     EMSCRIPTEN_KEEPALIVE
+    void* webgpu_get_frame_buffer();
+
+    EMSCRIPTEN_KEEPALIVE
     uint8_t* get_frame_buffer() {
-        static std::vector<uint8_t> frame_buffer(1280 * 720 * 4); // RGBA
-        static uint32_t frame_counter = 0;
-        frame_counter++;
-        for (int y = 0; y < 720; y++) {
-            for (int x = 0; x < 1280; x++) {
-                int idx = (y * 1280 + x) * 4;
-                uint32_t pixel = (x + y + frame_counter) * 7;
-                frame_buffer[idx] = pixel % 255;
-                frame_buffer[idx + 1] = (pixel * 2) % 255;
-                frame_buffer[idx + 2] = (pixel * 3) % 255;
-                frame_buffer[idx + 3] = 255;
-            }
-        }
-        return frame_buffer.data();
+        return reinterpret_cast<uint8_t*>(webgpu_get_frame_buffer());
     }
 }
