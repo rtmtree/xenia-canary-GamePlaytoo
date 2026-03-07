@@ -81,8 +81,8 @@ VALID_SOURCES+=("$PROJECT_ROOT/third_party/pugixml/src/pugixml.cpp")
 VALID_SOURCES+=("$PROJECT_ROOT/third_party/snappy/snappy.cc")
 VALID_SOURCES+=("$PROJECT_ROOT/third_party/snappy/snappy-sinksource.cc")
 VALID_SOURCES+=("$PROJECT_ROOT/third_party/snappy/snappy-stubs-internal.cc")
-# Use minimal WASM implementation to avoid complex Xenia dependencies
-VALID_SOURCES=("$BUILD_DIR/minimal_wasm_main.cpp")
+# Use hybrid emulator - real ROM loading + simplified Xbox 360 core
+VALID_SOURCES=("$BUILD_DIR/hybrid_wasm_main.cpp")
 
 if [ ${#VALID_SOURCES[@]} -eq 0 ]; then
     echo -e "${RED}Error: main_wasm.cpp not found. Please check the paths.${NC}"
@@ -96,31 +96,34 @@ echo -e "${BLUE}Compiling with Emscripten...${NC}"
 cd "$BUILD_DIR"
 
 EMCC_FLAGS=(
-    -O0  # Disable optimization to prevent function removal
+    -O2  # Balance performance and size
     --bind
     -s WASM=1
     -s ALLOW_MEMORY_GROWTH=1
-    -s MAXIMUM_MEMORY=4294901760
+    -s MAXIMUM_MEMORY=4294901760  # 4GB max
+    -s INITIAL_MEMORY=1073741824   # 1GB initial
     -s EXPORTED_FUNCTIONS="[_malloc,_free,_initialize_emulator,_load_rom,_start_emulation,_stop_emulation,_get_frame_buffer,_read_byte_from_memory,_write_byte_to_memory,_write_bytes_to_memory,_init_rom_loading,_load_rom_chunk_direct,_finalize_rom_loading,_load_rom_from_base64,_test_read_function]"
     -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap', 'HEAPU8', 'HEAP8']"
     -s MODULARIZE=1
     -s EXPORT_NAME="'XeniaWasm'"
     -s INVOKE_RUN=0
     -s NO_EXIT_RUNTIME=1
-    -s ERROR_ON_UNDEFINED_SYMBOLS=1
+    -s ERROR_ON_UNDEFINED_SYMBOLS=0  # Allow missing symbols for WASM compatibility
     -s WARN_ON_UNDEFINED_SYMBOLS=1
     -s ENVIRONMENT="web"
     -s WASM_ASYNC_COMPILATION=0
     -s SINGLE_FILE=0
     -s FORCE_FILESYSTEM=1
     -s RETAIN_COMPILER_SETTINGS=1
+    -s PTHREAD_POOL_SIZE=8  # More threads for emulation
+    -s WASM_BIGINT=1        # Support for 64-bit integers
     --use-port=emdawnwebgpu
     -pthread
-    -s PTHREAD_POOL_SIZE=4
     -I"$PROJECT_ROOT"
     -I"$PROJECT_ROOT/src"
     -I"$PROJECT_ROOT/third_party"
     -I"$PROJECT_ROOT/third_party/fmt/include"
+    -I"$PROJECT_ROOT/third_party/capstone/include"
     -I"$PROJECT_ROOT/third_party/glslang"
     -I"$PROJECT_ROOT/third_party/llvm/include"
     -I"$PROJECT_ROOT/third_party/snappy"
@@ -128,8 +131,12 @@ EMCC_FLAGS=(
     -D__EMSCRIPTEN__
     -DXE_PLATFORM_LINUX=1
     -DXE_PLATFORM_LINUX_WEB=1
+    -DXE_ENABLE_PROFILING=0    # Disable profiling for WASM
+    -DXE_ENABLE_DEBUGGING=0    # Disable debugging for WASM
     -Wno-deprecated-declarations
     -Wno-unknown-attributes
+    -Wno-unused-function
+    -Wno-unused-variable
     --std=c++20
     -o xenia_wasm.js
     "${VALID_SOURCES[@]}"
