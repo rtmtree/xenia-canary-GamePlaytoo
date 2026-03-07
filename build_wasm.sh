@@ -81,10 +81,8 @@ VALID_SOURCES+=("$PROJECT_ROOT/third_party/pugixml/src/pugixml.cpp")
 VALID_SOURCES+=("$PROJECT_ROOT/third_party/snappy/snappy.cc")
 VALID_SOURCES+=("$PROJECT_ROOT/third_party/snappy/snappy-sinksource.cc")
 VALID_SOURCES+=("$PROJECT_ROOT/third_party/snappy/snappy-stubs-internal.cc")
-# Use ONLY our minimal main_wasm.cpp file to avoid Xenia's complex memory system
-#VALID_SOURCES=()
-#VALID_SOURCES=("$BUILD_DIR/main_wasm.cpp")
-VALID_SOURCES+=("$BUILD_DIR/main_wasm.cpp")
+# Use minimal WASM implementation to avoid complex Xenia dependencies
+VALID_SOURCES=("$BUILD_DIR/minimal_wasm_main.cpp")
 
 if [ ${#VALID_SOURCES[@]} -eq 0 ]; then
     echo -e "${RED}Error: main_wasm.cpp not found. Please check the paths.${NC}"
