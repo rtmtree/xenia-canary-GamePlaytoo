@@ -110,6 +110,9 @@ std::mutex g_mapped_file_ranges_mutex;
 
 void* AllocFixed(void* base_address, size_t length,
                  AllocationType allocation_type, PageAccess access) {
+#if XE_ARCH_WASM32
+  return base_address ? base_address : std::malloc(length);
+#else
   // mmap does not support reserve / commit, so ignore allocation_type.
   uint32_t prot = ToPosixProtectFlags(access);
   int flags = MAP_PRIVATE | MAP_ANONYMOUS;
@@ -130,10 +133,16 @@ void* AllocFixed(void* base_address, size_t length,
     return result;
   }
   return nullptr;
+#endif
 }
 
 bool DeallocFixed(void* base_address, size_t length,
                   DeallocationType deallocation_type) {
+#if XE_ARCH_WASM32
+  if (!base_address) return true;
+  // Leak for now, or free if it was dynamically allocated without base_address.
+  return true;
+#else
   const auto region_begin = reinterpret_cast<uintptr_t>(base_address);
   const uintptr_t region_end =
       reinterpret_cast<uintptr_t>(base_address) + length;
@@ -161,10 +170,15 @@ bool DeallocFixed(void* base_address, size_t length,
     default:
       assert_unhandled_case(deallocation_type);
   }
+#endif
 }
 
 bool Protect(void* base_address, size_t length, PageAccess access,
              PageAccess* out_old_access) {
+#if XE_ARCH_WASM32
+  if (out_old_access) *out_old_access = PageAccess::kReadWrite;
+  return true;
+#else
   if (out_old_access) {
     size_t length_copy = length;
     QueryProtect(base_address, length_copy, *out_old_access);
@@ -172,6 +186,7 @@ bool Protect(void* base_address, size_t length, PageAccess access,
 
   uint32_t prot = ToPosixProtectFlags(access);
   return mprotect(base_address, length, prot) == 0;
+#endif
 }
 
 bool QueryProtect(void* base_address, size_t& length, PageAccess& access_out) {

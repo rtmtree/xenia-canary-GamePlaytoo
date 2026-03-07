@@ -50,12 +50,13 @@ XENIA_SOURCES=($(find "$PROJECT_ROOT/src/xenia" -type f -name "*.cc" \
     ! -name "*_mac.cc" ! -name "*_ios.cc" ! -name "*_xaudio2.cc" \
     ! -name "*_xinput.cc" ! -name "*_winkey.cc" ! -name "*_gnulinux.cc" \
     ! -name "*_gtk.cc" ! -name "*renderdoc*.cc" ! -name "*_posix.cc" \
-    ! -name "spirv*.cc" ! -name "trace_*.cc" ! -name "texture_dump.cc" \
+    ! -name "spirv*.cc" ! -name "texture_dump.cc" \
+    ! -name "wasm_main.cc" ! -name "disc_zarchive*.cc" \
     ! -name "xma_context_new.cc" ! -name "xma_context_old.cc" ! -name "xma_context_master.cc" \
     ! -name "shader_compiler_main.cc" ! -name "*test*.cc"))
 
 # Check if source files exist
-VALID_SOURCES=()
+#VALID_SOURCES=()
 for source in "${XENIA_SOURCES[@]}"; do
     if [ -f "$source" ]; then
         VALID_SOURCES+=("$source")
@@ -67,9 +68,23 @@ VALID_SOURCES+=("$PROJECT_ROOT/third_party/fmt/src/os.cc")
 VALID_SOURCES+=("$PROJECT_ROOT/src/xenia/base/clock_posix.cc")
 VALID_SOURCES+=("$PROJECT_ROOT/src/xenia/base/threading_posix.cc")
 VALID_SOURCES+=("$PROJECT_ROOT/src/xenia/base/memory_posix.cc")
+VALID_SOURCES+=("$PROJECT_ROOT/src/xenia/base/filesystem_posix.cc")
+VALID_SOURCES+=("$PROJECT_ROOT/src/xenia/base/mapped_memory_posix.cc")
+VALID_SOURCES+=("$PROJECT_ROOT/src/xenia/base/exception_handler_posix.cc")
+VALID_SOURCES+=("$PROJECT_ROOT/src/xenia/base/debugging_posix.cc")
+VALID_SOURCES+=("$PROJECT_ROOT/src/xenia/cpu/stack_walker_posix.cc")
+VALID_SOURCES+=("$PROJECT_ROOT/third_party/imgui/imgui.cpp")
+VALID_SOURCES+=("$PROJECT_ROOT/third_party/imgui/imgui_draw.cpp")
+VALID_SOURCES+=("$PROJECT_ROOT/third_party/imgui/imgui_tables.cpp")
+VALID_SOURCES+=("$PROJECT_ROOT/third_party/imgui/imgui_widgets.cpp")
+VALID_SOURCES+=("$PROJECT_ROOT/third_party/pugixml/src/pugixml.cpp")
+VALID_SOURCES+=("$PROJECT_ROOT/third_party/snappy/snappy.cc")
+VALID_SOURCES+=("$PROJECT_ROOT/third_party/snappy/snappy-sinksource.cc")
+VALID_SOURCES+=("$PROJECT_ROOT/third_party/snappy/snappy-stubs-internal.cc")
 # Use ONLY our minimal main_wasm.cpp file to avoid Xenia's complex memory system
-VALID_SOURCES=()
-VALID_SOURCES=("$BUILD_DIR/main_wasm.cpp")
+#VALID_SOURCES=()
+#VALID_SOURCES=("$BUILD_DIR/main_wasm.cpp")
+VALID_SOURCES+=("$BUILD_DIR/main_wasm.cpp")
 
 if [ ${#VALID_SOURCES[@]} -eq 0 ]; then
     echo -e "${RED}Error: main_wasm.cpp not found. Please check the paths.${NC}"
@@ -87,18 +102,19 @@ EMCC_FLAGS=(
     --bind
     -s WASM=1
     -s ALLOW_MEMORY_GROWTH=1
+    -s MAXIMUM_MEMORY=4294901760
     -s EXPORTED_FUNCTIONS="[_malloc,_free,_initialize_emulator,_load_rom,_start_emulation,_stop_emulation,_get_frame_buffer,_read_byte_from_memory,_write_byte_to_memory,_write_bytes_to_memory,_init_rom_loading,_load_rom_chunk_direct,_finalize_rom_loading,_load_rom_from_base64,_test_read_function]"
     -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap', 'HEAPU8', 'HEAP8']"
     -s MODULARIZE=1
     -s EXPORT_NAME="'XeniaWasm'"
     -s INVOKE_RUN=0
     -s NO_EXIT_RUNTIME=1
-    -s ERROR_ON_UNDEFINED_SYMBOLS=0
-    -s WARN_ON_UNDEFINED_SYMBOLS=0
+    -s ERROR_ON_UNDEFINED_SYMBOLS=1
+    -s WARN_ON_UNDEFINED_SYMBOLS=1
     -s ENVIRONMENT="web"
     -s WASM_ASYNC_COMPILATION=0
     -s SINGLE_FILE=0
-    -s NO_FORCE_FILESYSTEM=1
+    -s FORCE_FILESYSTEM=1
     -s RETAIN_COMPILER_SETTINGS=1
     --use-port=emdawnwebgpu
     -pthread
@@ -109,6 +125,8 @@ EMCC_FLAGS=(
     -I"$PROJECT_ROOT/third_party/fmt/include"
     -I"$PROJECT_ROOT/third_party/glslang"
     -I"$PROJECT_ROOT/third_party/llvm/include"
+    -I"$PROJECT_ROOT/third_party/snappy"
+    -I"$PROJECT_ROOT/third_party/pugixml/src"
     -D__EMSCRIPTEN__
     -DXE_PLATFORM_LINUX=1
     -DXE_PLATFORM_LINUX_WEB=1
@@ -229,4 +247,3 @@ EOF
 
 echo -e "${GREEN}Build completed successfully!${NC}"
 echo -e "${BLUE}Files copied to: $OUTPUT_DIR${NC}"
-echo -e "${YELLOW}Note: This is a minimal build. You'll need to integrate actual Xenia source files for full functionality.${NC}"

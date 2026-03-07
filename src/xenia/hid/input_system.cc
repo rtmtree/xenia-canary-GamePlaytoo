@@ -34,7 +34,7 @@ DEFINE_double(
     "Defines deadzone level for right stick. Allowed range [0.0-1.0].", "HID");
 
 InputSystem::InputSystem(xe::ui::Window* window) : window_(window) {
-  skylander_portal_ = std::make_unique<SkylanderPortalEmulated>();
+  //skylander_portal_ = std::make_unique<SkylanderPortalEmulated>();
 
 #ifdef XE_PLATFORM_WIN32
   skylander_portal_ = std::make_unique<SkylanderPortalLibusb>();

@@ -59,7 +59,7 @@ class PosixMappedMemory : public MappedMemory {
     void* data =
         mmap(0, map_length, protection, MAP_SHARED, file_descriptor, offset);
     ftruncate(file_descriptor, map_length);
-    if (!data) {
+    if (data == MAP_FAILED) {
       close(file_descriptor);
       return nullptr;
     }
@@ -87,10 +87,25 @@ class PosixMappedMemory : public MappedMemory {
  private:
   int file_descriptor_;
 };
+} // namespace xe
+#include <vector>
 
+extern std::vector<uint8_t> rom_data;
+
+namespace xe {
 std::unique_ptr<MappedMemory> MappedMemory::Open(
     const std::filesystem::path& path, Mode mode, size_t offset,
     size_t length) {
+  if (path.string() == "/game.bin" && mode == Mode::kRead && !::rom_data.empty()) {
+    struct VectorMappedMemory : public MappedMemory {
+      VectorMappedMemory() : MappedMemory(::rom_data.data(), ::rom_data.size()) {}
+      ~VectorMappedMemory() override {}
+      void Close(uint64_t truncate_size) override {}
+      void Flush() override {}
+    };
+    return std::make_unique<VectorMappedMemory>();
+  }
+
   int open_flags = 0;
   switch (mode) {
     case Mode::kRead:

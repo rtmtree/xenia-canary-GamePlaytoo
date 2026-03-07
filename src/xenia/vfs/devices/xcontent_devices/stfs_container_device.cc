@@ -97,7 +97,9 @@ StfsContainerDevice::Result StfsContainerDevice::Read() {
   if (n + 1 != descriptor.file_table_block_count) {
     XELOGW("STFS read {} file table blocks, but STFS headers expected {}!",
            n + 1, descriptor.file_table_block_count);
+#if !defined(__EMSCRIPTEN__)
     assert_always();
+#endif
   }
 
   return Result::kSuccess;
@@ -157,7 +159,9 @@ std::unique_ptr<StfsContainerEntry> StfsContainerDevice::ReadEntry(
           "bytes missing)",
           name, dir_entry->length.get() - remaining_size,
           dir_entry->length.get(), remaining_size);
+#if !defined(__EMSCRIPTEN__)
       assert_always();
+#endif
     }
 
     // Check that the number of blocks retrieved from hash entries matches
@@ -168,7 +172,9 @@ std::unique_ptr<StfsContainerEntry> StfsContainerDevice::ReadEntry(
           "blocks, expected {}",
           entry->name_, entry->block_list_.size(),
           dir_entry->allocated_data_blocks());
+#if !defined(__EMSCRIPTEN__)
       assert_always();
+#endif
     }
   }
 

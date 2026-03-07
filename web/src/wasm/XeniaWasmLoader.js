@@ -219,8 +219,7 @@ class XeniaWasmLoader {
         console.log(`🔍 Loading in ${totalChunks} chunks of ${chunkSize / 1024 / 1024}MB each`);
 
         // Initialize ROM loading in WASM
-        const initResult = this.module.ccall('init_rom_loading', 'number',
-            ['number'], [bytes.length]);
+        const initResult = this.module._init_rom_loading(bytes.length);
 
         if (initResult !== 0) {
             throw new Error('Failed to initialize ROM loading');
@@ -243,8 +242,7 @@ class XeniaWasmLoader {
                 this.copyChunkToWasm(chunk, chunkPtr);
 
                 // Load this chunk
-                const chunkResult = this.module.ccall('load_rom_chunk_direct', 'number',
-                    ['number', 'number', 'number'], [chunkPtr, start, chunk.length]);
+                const chunkResult = this.module._load_rom_chunk_direct(chunkPtr, start, chunk.length);
 
                 if (chunkResult !== 0) {
                     throw new Error(`Failed to load chunk ${i + 1}/${totalChunks}`);
@@ -259,7 +257,7 @@ class XeniaWasmLoader {
         }
 
         // Finalize ROM loading
-        const finalResult = this.module.ccall('finalize_rom_loading', 'number', [], []);
+        const finalResult = this.module._finalize_rom_loading();
 
         if (finalResult !== 0) {
             throw new Error('Failed to finalize ROM loading');

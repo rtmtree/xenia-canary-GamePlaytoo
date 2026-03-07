@@ -164,6 +164,17 @@ Memory::~Memory() {
 bool Memory::Initialize() {
   file_name_ = fmt::format("xenia_memory_{}", Clock::QueryHostTickCount());
 
+#if defined(__EMSCRIPTEN__)
+  mapping_base_ = (uint8_t*)0x1000; // pass assert
+  virtual_membase_ = (uint8_t*)0;
+  physical_membase_ = (uint8_t*)0;
+
+  uint8_t* phys_ram = (uint8_t*)std::malloc(0x20000000); // 512MB
+  uint8_t* v0_ram = (uint8_t*)std::malloc(0x40000000); // 1.0GB
+  uint8_t* v4_ram = (uint8_t*)std::malloc(0x3F000000); // ~1.0GB
+  uint8_t* v8_ram = (uint8_t*)std::malloc(0x10000000); // 256MB
+  uint8_t* v9_ram = (uint8_t*)std::malloc(0x10000000); // 256MB
+#else
   // Create main page file-backed mapping. This is all reserved but
   // uncommitted (so it shouldn't expand page file).
   mapping_ = xe::memory::CreateFileMappingHandle(
@@ -193,7 +204,18 @@ bool Memory::Initialize() {
   }
   virtual_membase_ = mapping_base_;
   physical_membase_ = mapping_base_ + 0x100000000ull;
+#endif
 
+#if defined(__EMSCRIPTEN__)
+  heaps_.v00000000.Initialize(this, virtual_membase_, HeapType::kGuestVirtual,
+                              0x00000000, 0x40000000, 4096, (uint32_t)v0_ram - 0x00000000);
+  heaps_.v40000000.Initialize(this, virtual_membase_, HeapType::kGuestVirtual,
+                              0x40000000, 0x40000000 - 0x01000000, 64 * 1024, (uint32_t)v4_ram - 0x40000000);
+  heaps_.v80000000.Initialize(this, virtual_membase_, HeapType::kGuestXex,
+                              0x80000000, 0x10000000, 64 * 1024, (uint32_t)v8_ram - 0x80000000);
+  heaps_.v90000000.Initialize(this, virtual_membase_, HeapType::kGuestXex,
+                              0x90000000, 0x10000000, 4096, (uint32_t)v9_ram - 0x90000000);
+#else
   // Prepare virtual heaps.
   heaps_.v00000000.Initialize(this, virtual_membase_, HeapType::kGuestVirtual,
                               0x00000000, 0x40000000, 4096);
@@ -203,8 +225,21 @@ bool Memory::Initialize() {
                               0x80000000, 0x10000000, 64 * 1024);
   heaps_.v90000000.Initialize(this, virtual_membase_, HeapType::kGuestXex,
                               0x90000000, 0x10000000, 4096);
+#endif
 
-  // Prepare physical heaps.
+#if defined(__EMSCRIPTEN__)
+  heaps_.physical.Initialize(this, physical_membase_, HeapType::kGuestPhysical,
+                             0x00000000, 0x20000000, 4096, (uint32_t)phys_ram - 0x00000000);
+  heaps_.vA0000000.Initialize(this, virtual_membase_, HeapType::kGuestPhysical,
+                              0xA0000000, 0x20000000, 64 * 1024,
+                              &heaps_.physical, (uint32_t)phys_ram - 0xA0000000);
+  heaps_.vC0000000.Initialize(this, virtual_membase_, HeapType::kGuestPhysical,
+                              0xC0000000, 0x20000000, 16 * 1024 * 1024,
+                              &heaps_.physical, (uint32_t)phys_ram - 0xC0000000);
+  heaps_.vE0000000.Initialize(this, virtual_membase_, HeapType::kGuestPhysical,
+                              0xE0000000, 0x1FD00000, 4096,
+                              &heaps_.physical, (uint32_t)phys_ram - 0xE0000000);
+#else
   heaps_.physical.Initialize(this, physical_membase_, HeapType::kGuestPhysical,
                              0x00000000, 0x20000000, 4096);
   heaps_.vA0000000.Initialize(this, virtual_membase_, HeapType::kGuestPhysical,
@@ -215,6 +250,7 @@ bool Memory::Initialize() {
                               &heaps_.physical);
   heaps_.vE0000000.Initialize(this, virtual_membase_, HeapType::kGuestPhysical,
                               0xE0000000, 0x1FD00000, 4096, &heaps_.physical);
+#endif
 
   // Protect the first and last 64kb of memory.
   heaps_.v00000000.AllocFixed(
@@ -1515,9 +1551,10 @@ VirtualHeap::~VirtualHeap() = default;
 
 void VirtualHeap::Initialize(Memory* memory, uint8_t* membase,
                              HeapType heap_type, uint32_t heap_base,
-                             uint32_t heap_size, uint32_t page_size) {
+                             uint32_t heap_size, uint32_t page_size,
+                             uint32_t host_address_offset) {
   BaseHeap::Initialize(memory, membase, heap_type, heap_base, heap_size,
-                       page_size);
+                       page_size, host_address_offset);
 }
 
 PhysicalHeap::PhysicalHeap() : parent_heap_(nullptr) {}
@@ -1527,9 +1564,11 @@ PhysicalHeap::~PhysicalHeap() = default;
 void PhysicalHeap::Initialize(Memory* memory, uint8_t* membase,
                               HeapType heap_type, uint32_t heap_base,
                               uint32_t heap_size, uint32_t page_size,
-                              VirtualHeap* parent_heap) {
+                              VirtualHeap* parent_heap, uint32_t passed_host_address_offset) {
   uint32_t host_address_offset;
-  if (heap_base >= 0xE0000000 &&
+  if (passed_host_address_offset != 0) {
+    host_address_offset = passed_host_address_offset;
+  } else if (heap_base >= 0xE0000000 &&
       xe::memory::allocation_granularity() > 0x1000) {
     host_address_offset = 0x1000;
   } else {

@@ -231,7 +231,8 @@ class VirtualHeap : public BaseHeap {
 
   // Initializes the heap properties and allocates the page table.
   void Initialize(Memory* memory, uint8_t* membase, HeapType heap_type,
-                  uint32_t heap_base, uint32_t heap_size, uint32_t page_size);
+                  uint32_t heap_base, uint32_t heap_size, uint32_t page_size,
+                  uint32_t host_address_offset = 0);
 };
 
 // A heap for ranges of memory that are mapped to physical ranges.
@@ -249,7 +250,7 @@ class PhysicalHeap : public BaseHeap {
   // Initializes the heap properties and allocates the page table.
   void Initialize(Memory* memory, uint8_t* membase, HeapType heap_type,
                   uint32_t heap_base, uint32_t heap_size, uint32_t page_size,
-                  VirtualHeap* parent_heap);
+                  VirtualHeap* parent_heap, uint32_t host_address_offset = 0);
 
   bool Alloc(uint32_t size, uint32_t alignment, uint32_t allocation_type,
              uint32_t protect, bool top_down, uint32_t* out_address) override;

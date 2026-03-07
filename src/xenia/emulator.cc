@@ -291,7 +291,9 @@ X_STATUS Emulator::Setup(
   }
 
   // Add inputSystem to UI
-  imgui_drawer_->LoadInputSystem(input_system_.get());
+  if (imgui_drawer_) {
+    imgui_drawer_->LoadInputSystem(input_system_.get());
+  }
 
   XELOGI("{}: Initializing VFS...", __func__);
   // Bring up the virtual filesystem used by the kernel.
@@ -377,7 +379,7 @@ const std::unique_ptr<vfs::Device> Emulator::CreateVfsDevice(
       return std::make_unique<vfs::DiscImageDevice>(mount_path, path);
     } break;
     case FileSignatureType::ZAR: {
-      return std::make_unique<vfs::DiscZarchiveDevice>(mount_path, path);
+      return nullptr;
     } break;
     case FileSignatureType::EXE:
     case FileSignatureType::Unknown:
@@ -943,120 +945,13 @@ X_STATUS Emulator::InstallContentPackage(
 X_STATUS Emulator::ExtractZarchivePackage(
     const std::filesystem::path& path,
     const std::filesystem::path& extract_dir) {
-  std::unique_ptr<vfs::Device> device =
-      std::make_unique<vfs::DiscZarchiveDevice>("", path);
-  if (!device->Initialize()) {
-    XELOGE("Failed to initialize device");
-    return X_STATUS_INVALID_PARAMETER;
-  }
-
-  if (std::filesystem::exists(extract_dir)) {
-    // TODO(Gliniak): Popup
-    // Do you want to overwrite already existing data?
-  } else {
-    std::error_code error_code;
-    std::filesystem::create_directories(extract_dir, error_code);
-    if (error_code) {
-      return error_code.value();
-    }
-  }
-
-  uint64_t progress = 0;
-  return vfs::VirtualFileSystem::ExtractContentFiles(device.get(), extract_dir,
-                                                     progress);
+  return X_STATUS_INVALID_PARAMETER;
 }
 
 X_STATUS Emulator::CreateZarchivePackage(
     const std::filesystem::path& inputDirectory,
     const std::filesystem::path& outputFile) {
-  std::vector<uint8_t> buffer;
-  buffer.resize(64 * 1024);
-
-  std::error_code ec;
-  PackContext packContext;
-  packContext.outputFilePath = outputFile;
-
-  ZArchiveWriter zWriter(
-      [](int32_t partIndex, void* ctx) {
-        PackContext* packContext = reinterpret_cast<PackContext*>(ctx);
-        packContext->currentOutputFile =
-            std::ofstream(packContext->outputFilePath, std::ios::binary);
-
-        if (!packContext->currentOutputFile.is_open()) {
-          XELOGI("Failed to create output file: {}\n",
-                 packContext->outputFilePath.string());
-          packContext->hasError = true;
-        }
-      },
-      [](const void* data, size_t length, void* ctx) {
-        PackContext* packContext = reinterpret_cast<PackContext*>(ctx);
-        packContext->currentOutputFile.write(
-            reinterpret_cast<const char*>(data), length);
-      },
-      &packContext);
-
-  if (packContext.hasError) {
-    return X_STATUS_UNSUCCESSFUL;
-  }
-
-  for (auto const& dirEntry :
-       std::filesystem::recursive_directory_iterator(inputDirectory)) {
-    std::filesystem::path pathEntry =
-        std::filesystem::relative(dirEntry.path(), inputDirectory, ec);
-
-    if (ec) {
-      XELOGI("Failed to get relative path {}\n", pathEntry.string());
-      return X_STATUS_UNSUCCESSFUL;
-    }
-
-    if (dirEntry.is_directory()) {
-      if (!zWriter.MakeDir(pathEntry.generic_string().c_str(), false)) {
-        XELOGI("Failed to create directory {}\n", pathEntry.string());
-        return X_STATUS_UNSUCCESSFUL;
-      }
-    } else if (dirEntry.is_regular_file()) {
-      // Don't pack itself to prevent infinite packing.
-      if (dirEntry == outputFile) {
-        continue;
-      }
-
-      XELOGI("Adding file: {}\n", pathEntry.string());
-
-      if (!zWriter.StartNewFile(pathEntry.generic_string().c_str())) {
-        XELOGI("Failed to create archive file {}\n", pathEntry.string());
-        return X_STATUS_UNSUCCESSFUL;
-      }
-
-      std::filesystem::path file_to_pack_path = inputDirectory / pathEntry;
-      FILE* file = xe::filesystem::OpenFile(file_to_pack_path, "rb");
-
-      if (!file) {
-        XELOGI("Failed to open input file {}\n", pathEntry.string());
-        return X_STATUS_UNSUCCESSFUL;
-      }
-
-      const uint64_t file_size = std::filesystem::file_size(file_to_pack_path);
-      uint64_t total_bytes_read = 0;
-
-      while (total_bytes_read < file_size) {
-        uint64_t bytes_read = fread(buffer.data(), 1, buffer.size(), file);
-
-        total_bytes_read += bytes_read;
-
-        zWriter.AppendData(buffer.data(), bytes_read);
-      }
-
-      fclose(file);
-    }
-
-    if (packContext.hasError) {
-      return X_STATUS_UNSUCCESSFUL;
-    }
-  }
-
-  zWriter.Finalize();
-
-  return X_STATUS_SUCCESS;
+  return X_STATUS_INVALID_PARAMETER;
 }
 
 void Emulator::Pause() {
@@ -1426,7 +1321,9 @@ X_STATUS Emulator::CompleteLaunch(const std::filesystem::path& path,
                                   const std::string_view module_path) {
   // Making changes to the UI (setting the icon) and executing game config
   // load callbacks which expect to be called from the UI thread.
+#if !defined(__EMSCRIPTEN__)
   assert_true(display_window_->app_context().IsInUIThread());
+#endif
 
   // Setup NullDevices for raw HDD partition accesses
   // Cache/STFC code baked into games tries reading/writing to these
