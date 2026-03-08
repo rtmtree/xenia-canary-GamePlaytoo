@@ -125,6 +125,7 @@ function App() {
       setStatus('Loading development ROM...');
 
       const response = await fetch('http://localhost:8008/risk.bin');
+      // const response = await fetch('http://localhost:8008/nier.iso');
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }

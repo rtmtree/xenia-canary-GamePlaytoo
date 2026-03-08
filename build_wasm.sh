@@ -81,7 +81,7 @@ VALID_SOURCES+=("$PROJECT_ROOT/third_party/pugixml/src/pugixml.cpp")
 VALID_SOURCES+=("$PROJECT_ROOT/third_party/snappy/snappy.cc")
 VALID_SOURCES+=("$PROJECT_ROOT/third_party/snappy/snappy-sinksource.cc")
 VALID_SOURCES+=("$PROJECT_ROOT/third_party/snappy/snappy-stubs-internal.cc")
-# Use hybrid emulator - real ROM loading + simplified Xbox 360 core
+# Use simplified but functional Xbox 360 emulator based on real Xenia concepts
 VALID_SOURCES=("$BUILD_DIR/hybrid_wasm_main.cpp")
 
 if [ ${#VALID_SOURCES[@]} -eq 0 ]; then
