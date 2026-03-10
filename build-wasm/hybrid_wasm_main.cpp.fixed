@@ -1,0 +1,95 @@
+// Initialize Xbox 360 emulator state
+void init_xbox360_state() {
+    xbox_state.pc = 0;
+    memset(xbox_state.gpr, 0, sizeof(xbox_state.gpr));
+    memset(xbox_state.fpr, 0, sizeof(xbox_state.fpr));
+    xbox_state.lr = 0;
+    xbox_state.ctr = 0;
+    xbox_state.cr = 0;
+    xbox_state.xer = 0;
+    
+    // Allocate 512MB memory
+    size_t memory_size = 512 * 1024 * 1024;
+    xbox_state.memory = new uint8_t[memory_size];
+    memset(xbox_state.memory, 0, memory_size);
+    
+    memset(xbox_state.frame_buffer, 0, sizeof(xbox_state.frame_buffer));
+    xbox_state.halted = false;
+    xbox_state.entry_point = 0;
+    xbox_state.xex_loaded = false;
+    
+    // Initialize GPU registers
+    memset(xbox_state.gpu_regs, 0, sizeof(xbox_state.gpu_regs));
+    xbox_state.rb_base = 0;
+    xbox_state.rb_wptr = 0;
+    xbox_state.rb_rptr = 0;
+
+    // Log detailed RAM information
+    std::cout << "🔍 === Xbox 360 Memory Analysis ===" << std::endl;
+    std::cout << "🔍 RAM allocated: " << memory_size << " bytes (" << (memory_size / (1024*1024)) << " MB)" << std::endl;
+    std::cout << "🔍 Memory pointer: 0x" << std::hex << (uintptr_t)xbox_state.memory << std::endl;
+    std::cout << "🔍 Valid memory range: 0x0 - 0x" << std::hex << (memory_size - 1) << std::endl;
+    std::cout << "🔍 Standard XEX load address: 0x92000000" << std::endl;
+    std::cout << "🔍 Address 0x92000000 in range: " << (0x92000000 < memory_size ? "YES" : "NO") << std::endl;
+    
+    // Calculate safe load address within our memory
+    uint32_t safe_load_address = memory_size / 2; // Load in middle of available memory
+    std::cout << "🔍 Safe load address: 0x" << std::hex << safe_load_address << std::endl;
+    std::cout << "🔍 Available after safe load: " << std::dec << (memory_size - safe_load_address) << " bytes" << std::endl;
+    std::cout << "🔍 ==================================" << std::endl;
+}
+
+// Simulated Command Processor
+void process_gpu_commands() {
+    if (!xbox_state.memory || xbox_state.rb_base == 0) return;
+    
+    // Process from RPTR to WPTR
+    while (xbox_state.rb_rptr != xbox_state.rb_wptr) {
+        uint32_t packet_addr = xbox_state.rb_base + (xbox_state.rb_rptr * 4);
+        if (packet_addr + 4 > 512 * 1024 * 1024) break;
+        
+        uint32_t packet = *(uint32_t*)(xbox_state.memory + packet_addr);
+        uint32_t type = (packet >> 30) & 0x3;
+        
+        if (type == 3) {
+            uint32_t opcode = (packet >> 8) & 0x7F;
+            uint32_t count = ((packet >> 16) & 0x3FFF) + 1;
+            
+            switch (opcode) {
+                case PM4_DRAW_INDX:
+                case PM4_DRAW_INDX_2:
+                    // Signal the WebGPU backend that we have a draw call
+                    EM_ASM({
+                        if (window._webgpu_on_draw) {
+                            window._webgpu_on_draw($0);
+                        }
+                    }, opcode);
+                    break;
+                    
+                case PM4_SET_CONSTANT:
+                    // Update GPU registers
+                    {
+                        uint32_t first_reg = *(uint32_t*)(xbox_state.memory + packet_addr + 4) & 0x7FFF;
+                        for (uint32_t i = 0; i < count - 1; i++) {
+                            uint32_t reg_val = *(uint32_t*)(xbox_state.memory + packet_addr + 8 + (i * 4));
+                            if (first_reg + i < 0x5000) {
+                                xbox_state.gpu_regs[first_reg + i] = reg_val;
+                            }
+                        }
+                    }
+                    break;
+                    
+                case PM4_XE_SWAP:
+                    break;
+                default:
+                    break;
+            }
+            
+            xbox_state.rb_rptr += (1 + count);
+        } else {
+            xbox_state.rb_rptr++;
+        }
+        
+        if (xbox_state.rb_rptr > 0x1000) xbox_state.rb_rptr = 0;
+    }
+}

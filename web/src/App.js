@@ -124,7 +124,7 @@ function App() {
       console.log('🔄 Auto-loading development ROM from http://localhost:8008/risk.bin');
       setStatus('Loading development ROM...');
 
-      const response = await fetch('http://localhost:8008/risk.bin');
+      const response = await fetch('http://localhost:8008/risk2.bin');
       // const response = await fetch('http://localhost:8008/nier.iso');
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -189,6 +189,10 @@ function App() {
 
   const handlePlay = async () => {
     console.log('🎮 Starting game...');
+    if (isPlayingRef.current || isLoading) {
+      console.log('⚠️ Game already starting or playing, ignoring request');
+      return;
+    }
     if (!wasmLoader || !romData) {
       console.log({ wasmLoader, romData });
       setError('Please load a ROM first');
@@ -276,30 +280,51 @@ function App() {
   };
 
   const startRenderLoop = () => {
-    let lastFrameTime = 0;
+    let lastFrameTime = performance.now();
     let frameCount = 0;
+    let lastFpsUpdate = lastFrameTime;
 
     const renderFrame = async (currentTime) => {
       if (!isPlayingRef.current || isPausedRef.current) return;
 
       const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
 
+      frameCount++;
+      if (currentTime - lastFpsUpdate >= 1000) {
+        setFps(frameCount);
+        frameCount = 0;
+        lastFpsUpdate = currentTime;
+      }
+
+      // If WebGPU is active, we rely on the C++ _webgpu_render callback
+      // We don't need to do anything in the JS render loop except keep it alive for FPS
+      if (wasmLoader && wasmLoader.webGpuActive) {
+        wasmLoader.getFrameBuffer(); // Trigger C++ execution which calls _webgpu_render
+        requestAnimationFrame(renderFrame);
+        return;
+      }
+
+      const ctx = canvas.getContext('2d');
       // Get frame buffer pointer
       const frameBuffer = wasmLoader.getFrameBuffer();
 
       if (frameBuffer) {
         try {
+          // If WebGPU is active, skipping 2D context update
+          if (wasmLoader.webGpuActive) return;
+
           // Use the new async frame buffer reading method
           const frameBufferData = await wasmLoader.getFrameBufferData(canvas.width, canvas.height);
 
-          // Create ImageData from the frame buffer data
-          const imageData = new ImageData(
-            new Uint8ClampedArray(frameBufferData),
-            canvas.width,
-            canvas.height
-          );
-          ctx.putImageData(imageData, 0, 0);
+          if (ctx) {
+            // Create ImageData from the frame buffer data
+            const imageData = new ImageData(
+              new Uint8ClampedArray(frameBufferData),
+              canvas.width,
+              canvas.height
+            );
+            ctx.putImageData(imageData, 0, 0);
+          }
 
         } catch (error) {
           console.error('❌ Failed to read frame buffer:', error);
@@ -314,7 +339,7 @@ function App() {
     };
 
     // Start the render loop
-    renderFrame();
+    renderFrame(performance.now());
   };
 
   const handleFullscreen = () => {
@@ -338,7 +363,21 @@ function App() {
   return (
     <AppContainer>
       <Header>
-        <Title>Xenia Web Emulator</Title>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px' }}>
+          <Title>Xenia Web Emulator</Title>
+          {wasmLoader && wasmLoader.webGpuActive && (
+            <span style={{
+              background: 'linear-gradient(45deg, #00f2fe 0%, #4facfe 100%)',
+              color: 'white',
+              padding: '4px 10px',
+              borderRadius: '20px',
+              fontSize: '0.8rem',
+              fontWeight: 'bold',
+              boxShadow: '0 0 10px rgba(79, 172, 254, 0.5)',
+              textShadow: '0 0 5px rgba(255,255,255,0.5)'
+            }}>WEBGPU ACTIVE</span>
+          )}
+        </div>
         <Subtitle>Xbox 360 Emulator in the Browser</Subtitle>
       </Header>
 
@@ -361,6 +400,7 @@ function App() {
           <GameCanvas
             ref={canvasRef}
             isLoading={isLoading}
+            isPlaying={isPlaying}
             error={error}
             onRetry={handleErrorRetry}
           />

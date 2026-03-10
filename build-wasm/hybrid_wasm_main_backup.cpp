@@ -11,12 +11,10 @@
 #include <cmath>
 #include <iomanip>
 
-// Global ROM storage with pre-allocated buffer
+// Global ROM storage and emulator state
 static std::vector<uint8_t> rom_data;
 static bool rom_loading_initialized = false;
 static bool emulator_running = false;
-static uint8_t* chunk_buffer = nullptr; // Pre-allocated chunk buffer
-static const size_t CHUNK_BUFFER_SIZE = 200 * 1024 * 1024; // 200MB buffer
 
 // Real Xbox 360 emulator state
 struct Xbox360State {
@@ -386,8 +384,8 @@ void execute_instruction() {
     }
     
     // Skip padding/zero sections (common in XEX files)
-    static uint32_t zero_skip_count = 0;
     if (instr == 0) {
+        static uint32_t zero_skip_count = 0;
         zero_skip_count++;
         
         // Skip up to 1KB of zeros before giving up
@@ -551,90 +549,22 @@ extern "C" {
     }
     
     EMSCRIPTEN_KEEPALIVE
-    void load_rom(uint8_t* data, uint32_t size) {
-        if (data && size > 0) {
-            rom_data.clear();
-            rom_data.insert(rom_data.end(), data, data + size);
-            std::cout << "🔍 Loaded ROM: " << size << " bytes" << std::endl;
-        }
+    void init_rom_loading() {
+        rom_data.clear();
+        rom_loading_initialized = true;
+        std::cout << "🔍 ROM loading initialized" << std::endl;
     }
     
     EMSCRIPTEN_KEEPALIVE
-    int init_rom_loading(uint32_t total_size) {
-        try {
-            rom_data.clear();
-            
-            // Limit reservation to a safe value for 32-bit (max 3GB)
-            uint32_t reserve_size = std::min(total_size, 3000U * 1024 * 1024);
-            rom_data.reserve(reserve_size);
-            
-            rom_loading_initialized = true;
-            std::cout << "🔍 ROM loading initialized (total size: " << total_size << " bytes)" << std::endl;
-            return 0; // Return success
-        } catch (...) {
-            std::cout << "🔍 Failed to initialize ROM loading" << std::endl;
-            return -1;
-        }
-    }
-    
-    EMSCRIPTEN_KEEPALIVE
-    uint8_t* get_chunk_buffer() {
-        if (chunk_buffer == nullptr) {
-            // Allocate buffer if not already done
-            chunk_buffer = new uint8_t[CHUNK_BUFFER_SIZE];
-            std::cout << "🔍 Chunk buffer allocated: " << CHUNK_BUFFER_SIZE << " bytes" << std::endl;
-        }
-        return chunk_buffer;
-    }
-    
-    EMSCRIPTEN_KEEPALIVE
-    int load_rom_chunk_direct(uint8_t* data, uint32_t offset, uint32_t size) {
+    void load_rom_chunk_direct(uint8_t* data, uint32_t size) {
         if (!rom_loading_initialized) {
             std::cout << "🔍 ROM loading not initialized" << std::endl;
-            return -1;
+            return;
         }
         
-        // Validate input parameters
-        if (data == nullptr) {
-            std::cout << "🔍 Null data pointer" << std::endl;
-            return -1;
-        }
-        
-        if (size == 0) {
-            return 0; // Success for empty chunk
-        }
-        
-        // Check for reasonable size limits (4GB for 32-bit WASM)
-        const size_t MAX_ROM_SIZE = 4000ULL * 1024 * 1024; // ~4GB limit
-        if (offset + size > MAX_ROM_SIZE) {
-            std::cout << "🔍 ROM size limit exceeded" << std::endl;
-            return -1;
-        }
-        
-        try {
-            // Ensure rom_data is large enough for this chunk
-            if (rom_data.size() < offset + size) {
-                rom_data.resize(offset + size);
-            }
-            
-            // Copy data directly to the correct offset in rom_data
-            std::copy(data, data + size, rom_data.begin() + offset);
-            
-            // Periodically log progress for large loads
-            static uint32_t last_log_mb = 0;
-            uint32_t current_mb = (offset + size) / (1024 * 1024);
-            if (current_mb >= last_log_mb + 100) {
-                std::cout << "🔍 Loaded ROM chunk: " << size << " bytes (total: " << (offset + size) << " bytes)" << std::endl;
-                last_log_mb = current_mb;
-            }
-            return 0; // Return success
-            
-        } catch (const std::exception& e) {
-            std::cout << "🔍 Memory operation failed: " << e.what() << std::endl;
-            return -1;
-        } catch (...) {
-            std::cout << "🔍 Unknown error during ROM loading" << std::endl;
-            return -1;
+        if (data && size > 0) {
+            rom_data.insert(rom_data.end(), data, data + size);
+            std::cout << "🔍 Loaded ROM chunk: " << size << " bytes (total: " << rom_data.size() << ")" << std::endl;
         }
     }
     

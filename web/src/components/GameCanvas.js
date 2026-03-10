@@ -85,7 +85,34 @@ const RetryButton = styled.button`
   }
 `;
 
-const GameCanvasComponent = React.forwardRef(({ isLoading, error, onRetry }, ref) => {
+const PlaceholderOverlay = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 5;
+`;
+
+const PlaceholderText = styled.h3`
+  color: #fff;
+  font-size: 1.5rem;
+  margin-bottom: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+`;
+
+const PlaceholderSubtext = styled.p`
+  color: #888;
+  font-size: 1rem;
+`;
+
+const GameCanvasComponent = React.forwardRef(({ isLoading, isPlaying, error, onRetry }, ref) => {
   const canvasRef = useRef(null);
 
   // Forward the ref to the canvas element
@@ -94,22 +121,10 @@ const GameCanvasComponent = React.forwardRef(({ isLoading, error, onRetry }, ref
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas) {
-      // Set canvas size
+      // Set canvas size (1280x720 internal res for Xbox 360)
       canvas.width = 1280;
       canvas.height = 720;
-
-      // Initial clear with black background
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Draw placeholder text
-      ctx.fillStyle = '#333';
-      ctx.font = '24px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('No game loaded', canvas.width / 2, canvas.height / 2);
-      ctx.font = '16px Arial';
-      ctx.fillText('Import a ROM file to start', canvas.width / 2, canvas.height / 2 + 30);
+      // Note: We avoid getting '2d' context here so WebGPU can claim it later
     }
   }, []);
 
@@ -117,22 +132,30 @@ const GameCanvasComponent = React.forwardRef(({ isLoading, error, onRetry }, ref
     <CanvasContainer>
       <GameCanvas
         ref={canvasRef}
+        id="game-canvas"
         width={1280}
         height={720}
       />
-      
+
       {isLoading && (
         <LoadingOverlay>
           <Spinner />
           <p>Loading game...</p>
         </LoadingOverlay>
       )}
-      
+
       {error && (
         <ErrorOverlay>
           <ErrorMessage>{error}</ErrorMessage>
           <RetryButton onClick={onRetry}>Retry</RetryButton>
         </ErrorOverlay>
+      )}
+
+      {!isLoading && !isPlaying && !error && (
+        <PlaceholderOverlay id="canvas-placeholder">
+          <PlaceholderText>Xenia WebGPU Launcher</PlaceholderText>
+          <PlaceholderSubtext>Import an Xbox 360 ROM to begin</PlaceholderSubtext>
+        </PlaceholderOverlay>
       )}
     </CanvasContainer>
   );

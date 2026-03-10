@@ -58,3 +58,6 @@ ERROR
 Uncaught TypeError: Failed to execute 'importScripts' on 'WorkerGlobalScope': Module scripts don't support importScripts().
     at handleError (http://localhost:3007/static/js/bundle.js:36131:58)
     at http://localhost:3007/static/js/bundle.js:36150:7
+
+
+    continue Next Steps toward making the canvas really render the ROM with WEBGPU (use original Vulkan as reference)

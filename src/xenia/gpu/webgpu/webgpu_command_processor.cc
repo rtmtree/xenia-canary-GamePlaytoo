@@ -205,6 +205,30 @@ void WebGPUCommandProcessor::RenderFrame() {
     const context = canvas.getContext('webgpu');
     const currentTexture = context.getCurrentTexture();
     
+    // Create or update guest texture
+    if (!window.guestTexture) {
+      window.guestTexture = device.createTexture({
+        size: [1280, 720, 1],
+        format: 'rgba8unorm',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
+      
+      window.guestSampler = device.createSampler({
+        magFilter: 'linear',
+        minFilter: 'linear',
+      });
+    }
+    
+    // Upload frame buffer data
+    const framebufferPtr = $0;
+    const framebufferData = HEAPU8.subarray(framebufferPtr, framebufferPtr + 1280 * 720 * 4);
+    queue.writeTexture(
+      { texture: window.guestTexture },
+      framebufferData,
+      { bytesPerRow: 1280 * 4 },
+      { width: 1280, height: 720 }
+    );
+    
     // Create command encoder
     const commandEncoder = device.createCommandEncoder();
     
@@ -220,82 +244,75 @@ void WebGPUCommandProcessor::RenderFrame() {
     
     const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
     
-    // Generate animated test pattern
-    const frameCounter = frame_counter;
-    const width = 1280;
-    const height = 720;
-    
-    // Create a simple vertex shader for test pattern
+    // Vertex shader for a full-screen quad
     const vertexShaderCode = `
       @vertex
       fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> @builtin(position) vec4<f32> {
-        let pos = array<vec2<f32>, 6>(
+        var pos = array<vec2<f32>, 4>(
           vec2<f32>(-1.0, -1.0),
           vec2<f32>( 1.0, -1.0),
-          vec2<f32>( 1.0,  1.0),
-          vec2<f32>(-1.0, -1.0),
-          vec2<f32>( 1.0,  1.0),
-          vec2<f32>(-1.0,  1.0)
+          vec2<f32>(-1.0,  1.0),
+          vec2<f32>( 1.0,  1.0)
         );
         return vec4<f32>(pos[vertexIndex], 0.0, 1.0);
       }
     `;
     
-    // Create fragment shader for animated pattern
+    // Fragment shader that samples the guest texture
     const fragmentShaderCode = `
+      @group(0) @binding(0) var mySampler: sampler;
+      @group(0) @binding(1) var myTexture: texture_2d<f32>;
+
       @fragment
       fn fs_main(@builtin(position) fragCoord: vec4<f32>) -> @location(0) vec4<f32> {
-        let x = fragCoord.x;
-        let y = fragCoord.y;
-        let frame = ` + frameCounter + `.0;
-        
-        let r = sin((x + y + frame) * 0.01) * 0.5 + 0.5;
-        let g = sin((x * 2.0 + frame) * 0.01) * 0.5 + 0.5;
-        let b = sin((y * 2.0 + frame) * 0.01) * 0.5 + 0.5;
-        
-        return vec4<f32>(r, g, b, 1.0);
+        let uv = fragCoord.xy / vec2<f32>(1280.0, 720.0);
+        return textureSample(myTexture, mySampler, uv);
       }
     `;
     
-    // Create shaders
-    const vertexShader = device.createShaderModule({
-      code: vertexShaderCode
-    });
-    
-    const fragmentShader = device.createShaderModule({
-      code: fragmentShaderCode
-    });
-    
-    // Create pipeline
-    const pipelineDescriptor = {
-      layout: 'auto',
-      vertex: {
-        "module": vertexShader,
-        entryPoint: 'vs_main',
-      },
-      fragment: {
-        "module": fragmentShader,
-        entryPoint: 'fs_main',
-        targets: [{
-          format: navigator.gpu.getPreferredCanvasFormat(),
-        }],
-      },
-      primitive: {
-        topology: 'triangle-list',
-      },
-    };
-    
-    const pipeline = device.createRenderPipeline(pipelineDescriptor);
+    // Create shaders if not already created
+    if (!window.webgpuPipelines) window.webgpuPipelines = {};
+    if (!window.webgpuPipelines.main) {
+      const vertexModule = device.createShaderModule({ code: vertexShaderCode });
+      const fragmentModule = device.createShaderModule({ code: fragmentShaderCode });
+      
+      const bindGroupLayout = device.createBindGroupLayout({
+        entries: [
+          { binding: 0, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
+          { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: {} },
+        ],
+      });
+      
+      window.webgpuPipelines.main = device.createRenderPipeline({
+        layout: device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] }),
+        vertex: { module: vertexModule, entryPoint: 'vs_main' },
+        fragment: {
+          module: fragmentModule,
+          entryPoint: 'fs_main',
+          targets: [{ format: navigator.gpu.getPreferredCanvasFormat() }],
+        },
+        primitive: { topology: 'triangle-strip' },
+      });
+      
+      window.webgpuBindGroup = device.createBindGroup({
+        layout: bindGroupLayout,
+        entries: [
+          { binding: 0, resource: window.guestSampler },
+          { binding: 1, resource: window.guestTexture.createView() },
+        ],
+      });
+    }
     
     // Draw
-    passEncoder.setPipeline(pipeline);
-    passEncoder.draw(6);
+    passEncoder.setPipeline(window.webgpuPipelines.main);
+    passEncoder.setBindGroup(0, window.webgpuBindGroup);
+    passEncoder.draw(4);
     passEncoder.end();
     
     // Submit commands
     const commandBuffer = commandEncoder.finish();
     queue.submit([commandBuffer]);
-  });
+  }, xe::gpu::webgpu::g_webgpu_frame_buffer);
 #endif
 }
 
