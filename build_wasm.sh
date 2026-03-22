@@ -98,6 +98,7 @@ cd "$BUILD_DIR"
 EMCC_FLAGS=(
     -O2  # Balance performance and size
     --bind
+    -lz
     -s WASM=1
     -s ALLOW_MEMORY_GROWTH=1
     -s MAXIMUM_MEMORY=4294901760  # 4GB max

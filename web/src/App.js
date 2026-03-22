@@ -296,11 +296,14 @@ function App() {
         lastFpsUpdate = currentTime;
       }
 
-      // If WebGPU is active, we rely on the C++ _webgpu_render callback
-      // We don't need to do anything in the JS render loop except keep it alive for FPS
+      // If WebGPU is active, manually drive _webgpu_render each frame since
+      // C++ _get_frame_buffer only returns a pointer and doesn't fire the callback
       if (wasmLoader && wasmLoader.webGpuActive) {
-        wasmLoader.getFrameBuffer(); // Trigger C++ execution which calls _webgpu_render
-        requestAnimationFrame(renderFrame);
+        const fbPtr = wasmLoader.getFrameBuffer();
+        if (fbPtr && globalThis._webgpu_render) {
+          globalThis._webgpu_render(fbPtr);
+        }
+        animationFrameRef.current = requestAnimationFrame(renderFrame);
         return;
       }
 
